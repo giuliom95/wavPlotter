@@ -124,10 +124,14 @@ int main() {
 	SDL_init();
 	
 	glBegin( GL_TRIANGLES );
+	
 		glColor3ub( 255, 0, 0 );
-		
 		glVertex2f( screenWidth / 2, screenHeight / 2 - 100 );
+		
+		glColor3ub( 0, 255, 0 );
 		glVertex2f( screenWidth / 2 + 86.6f, screenHeight / 2 + 50 );
+		
+		glColor3ub( 0, 0, 255 );
 		glVertex2f( screenWidth / 2 - 86.6f, screenHeight / 2 + 50 );
 		
 	glEnd();
