@@ -113,33 +113,3 @@ void SDL_close() {
 	//Quit SDL subsystems
 	SDL_Quit();
 }
-
-int main() {
-	gWindow = NULL;
-	gContext = NULL;
-	
-	screenWidth = 800;
-	screenHeight = 600;
-	
-	SDL_init();
-	
-	glBegin( GL_TRIANGLES );
-	
-		glColor3ub( 255, 0, 0 );
-		glVertex2f( screenWidth / 2, screenHeight / 2 - 100 );
-		
-		glColor3ub( 0, 255, 0 );
-		glVertex2f( screenWidth / 2 + 86.6f, screenHeight / 2 + 50 );
-		
-		glColor3ub( 0, 0, 255 );
-		glVertex2f( screenWidth / 2 - 86.6f, screenHeight / 2 + 50 );
-		
-	glEnd();
-	
-	SDL_GL_SwapWindow( gWindow );
-	
-	SDL_Delay(4000);
-	SDL_close();
-	
-	return 0;
-}
