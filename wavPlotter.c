@@ -3,11 +3,11 @@
 #include "SDL.h"
 
 //The window initial dimensions
-#define SCREEN_WIDTH 800
+#define SCREEN_WIDTH 1600
 #define SCREEN_HEIGHT 600
 
 //These two define the axis ratio of the plot.
-#define WIDTH 10
+#define WIDTH 1
 #define DEPTH 0.01f
 
 //The lenght(in bytes) of the header of a standard WAV file.
@@ -20,7 +20,7 @@ int main() {
 	int16_t* right;
 	
 	//The number of total 16-bit samples that compose a single channel.
-	int total_samples;
+	long total_samples;
 	
 	//An iterator. It will be used a lot of times, so I've declared it here
 	// once for all.
@@ -49,6 +49,8 @@ int main() {
 	// so, in order to get the samples, it must be divided by 4, because the channels
 	// are two and every samble is made up by 2 bytes (16-bit). 
 	total_samples = ( ftell( input_file ) - WAV_HEADER ) / 4;
+	
+	printf( "%i\n", total_samples );
 	
 	//Brings back the cursor to the head of the file.
 	fseek( input_file, 0, 0 );
@@ -81,40 +83,48 @@ int main() {
 	}
 	
 	//And now the plotting part.
+	long i2;
+	for (i2 = 0; i2 < total_samples / 500; i2++) {
+		printf( "%i %i\n", i2, total_samples / 500 );
+		//Cleans the screen
+		glClear( GL_COLOR_BUFFER_BIT );
+		
+		//Plots the time axis.
+		glBegin( GL_LINES );
+			glColor3ub( 150, 150, 150 );
+			glVertex2f( i2*500, screenHeight / 2 );
+			glVertex2f( screenWidth + i2*500, screenHeight / 2 );
+		glEnd();
+		
+		//NOTE: The FFT algorithm which I've talked about here: 
+		// http://giuliom95.tumblr.com/post/134427522354/
+		// will be implemented in those two next cycles.
+		
+		//Plots the left channel in red. 
+		glBegin( GL_LINE_STRIP );
+			glColor3ub( 255, 100, 100 );
+			for( i = 0; i < total_samples; i+=WIDTH ) {
+				glVertex2f( i, screenHeight / 2 + left[i/WIDTH] * DEPTH );
+			} 	
+		glEnd();
 	
-	//First of all the time axis.
-	glBegin( GL_LINES );
-		glColor3ub( 150, 150, 150 );
-		glVertex2f( 0, screenHeight / 2 );
-		glVertex2f( screenWidth, screenHeight / 2 );
-	glEnd();
-	
-	//NOTE: The FFT algorithm which I've talked about here: 
-	// http://giuliom95.tumblr.com/post/134427522354/
-	// will be implemented in those two next for cycles.
-	
-	//Then the left channel in red. 
-	glBegin( GL_LINE_STRIP );
-		glColor3ub( 255, 100, 100 );
-		for( i = 0; i < total_samples; i+=WIDTH ) {
-			glVertex2f( i, screenHeight / 2 + left[i/WIDTH] * DEPTH );
-		} 	
-	glEnd();
-	
-	//And finally the right channel in green.
-	glBegin( GL_LINE_STRIP );
-		glColor3ub( 100, 255, 100 );
-		for( i = 0; i < total_samples; i+=WIDTH ) {
-			glVertex2f( i, screenHeight / 2 + right[i/WIDTH] * DEPTH );
-		}	
-	glEnd();
-	
-	//Swaps buffers and actually prints the waveforms to the screen.
-	SDL_GL_SwapWindow( gWindow );
-	
-	//Keeps open the window for 3sec.
-	//NOTE: The progam exit is planned (obviously) to be user-driven.
-	SDL_Delay(3000);
+		//Plots the right channel in green.
+		glBegin( GL_LINE_STRIP );
+			glColor3ub( 100, 255, 100 );
+			for( i = 0; i < total_samples; i+=WIDTH ) {
+				glVertex2f( i, screenHeight / 2 + right[i/WIDTH] * DEPTH );
+			}	
+		glEnd();	
+		
+			
+		glMatrixMode( GL_PROJECTION );
+		glLoadIdentity();
+		glOrtho( i2*500, screenWidth + i2*500, screenHeight, 0.0, 1.0, -1.0 );
+		
+		SDL_GL_SwapWindow( gWindow );
+		
+		SDL_Delay(20);
+	}
 	
 	//Deallocates the memory allocated for the channels arrays.
 	free(left);

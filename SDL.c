@@ -41,10 +41,11 @@ int SDL_init() {
 					success = FALSE;
 				}
 				
-				//Make the cursor invisible
+				//I need the cursor visible so I've commented this part out.
+				/*//Make the cursor invisible
 				if( SDL_ShowCursor(SDL_DISABLE) == -1 ) {
 					printf( "Warning: Unable to hide the cursor! SDL Error: %s\n", SDL_GetError() );
-				}
+				}*/
 				
 				//Anti-aliasing
 				glHint(GL_LINE_SMOOTH_HINT, GL_NICEST );
