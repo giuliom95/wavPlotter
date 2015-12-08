@@ -6,11 +6,16 @@
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
-#define SCROLL_SPEED 100
+#define BASE_SCROLL_SPEED 100
 
 //These two define the axis ratio of the plot.
-#define WIDTH 1
-#define DEPTH 0.01f
+//BASE_WIDTH indicates the initial distance (in pixels) between two samples.
+#define BASE_WIDTH 1
+
+//DEPTH is the amplitude multiplier of the signal. 
+//It squeezes the plot into the window. It was obtained by the proportion:
+// 1 : 2^16 = DEPTH : SCREEN_HEIGHT 
+#define DEPTH 0.009155273f
 
 //The lenght(in bytes) of the header of a standard WAV file.
 #define WAV_HEADER 44
@@ -26,54 +31,25 @@ long total_samples;
 // once for all.
 int i;
 
-long position;
-unsigned int width;
+uint32_t position;
+uint16_t width;
 
-SDL_Event e;
-
-void refresh_plot() {
-	//Cleans the screen
-	glClear( GL_COLOR_BUFFER_BIT );
-	
-	glMatrixMode( GL_PROJECTION );
-	glLoadIdentity();
-	glOrtho( position, screenWidth + position, screenHeight, 0.0, 1.0, -1.0 );
-	
-	//Plots the time axis.
-	glBegin( GL_LINES );
-		glColor3ub( 150, 150, 150 );
-		glVertex2f( position, screenHeight / 2 );
-		glVertex2f( screenWidth + position, screenHeight / 2 );
-	glEnd();
-	
-	//NOTE: The FFT algorithm which I've talked about here: 
-	// http://giuliom95.tumblr.com/post/134427522354/
-	// will be implemented in those two next cycles.
-	
-	//Plots the left channel in red. 
-	glBegin( GL_LINE_STRIP );
-		glColor3ub( 255, 100, 100 );
-		for( i = 0; i < total_samples; i+=width ) {
-			glVertex2f( i, screenHeight / 2 + left[i/width] * DEPTH );
-		} 	
-	glEnd();
-
-	//Plots the right channel in green.
-	glBegin( GL_LINE_STRIP );
-		glColor3ub( 100, 255, 100 );
-		for( i = 0; i < total_samples; i+=width ) {
-			glVertex2f( i, screenHeight / 2 + right[i/width] * DEPTH );
-		}	
-	glEnd();	
-	
-	SDL_GL_SwapWindow( gWindow );
-}
+void refresh_plot();
 
 
 int main() {
 	
 	//The pointer to the wav file
 	FILE* input_file;
+	
+	SDL_Event e;
+	
+	uint8_t* currentKeyStates;
+	
+	int scroll_speed;
+	
+	
+	short exit, queue_length;
 	
 	//These variables are needed to make the OpenGL and SDL libraries work. 
 	gWindow = NULL;
@@ -82,7 +58,7 @@ int main() {
 	screenHeight = SCREEN_HEIGHT;
 	
 	position = 0;
-	width = WIDTH;
+	width = BASE_WIDTH;
 	
 	//Creates the window and the OpenGL contex.
 	SDL_init();
@@ -125,37 +101,79 @@ int main() {
 	//I got this info from: http://soundfile.sapp.org/doc/WaveFormat/ 
 	// Check it out further information.
 	for( i = 0; i < total_samples; i++ ) {
-		left[i] = (uint8_t)fgetc( input_file ) + (uint16_t)( fgetc( input_file ) << 8 );	
-		right[i] = (uint8_t)fgetc( input_file ) + (uint16_t)( fgetc( input_file ) << 8 );		
+		left[i] =  (uint8_t)fgetc(input_file) + (uint16_t)( fgetc(input_file) << 8 );
+		right[i] = (uint8_t)fgetc(input_file) + (uint16_t)( fgetc(input_file) << 8 );
 	}
 	
 	//Closes the file.
 	fclose( input_file );
-	
-	refresh_plot();
-	
+		
 	//And now the plotting part.
-	short exit = 0;
+	refresh_plot();
+	exit = 0;
 	while( !exit ) {
 		
+		queue_length = 0;
 		while( SDL_PollEvent( &e ) != 0 ) {
-		
-			if( e.type == SDL_QUIT ) {
-				exit = 1;
-			} else if( e.type == SDL_MOUSEWHEEL ) {
-				if( e.wheel.y != 0 ) {
-					position += e.wheel.y * SCROLL_SPEED;
-					refresh_plot();
-				}
-			} else if( e.type == SDL_KEYDOWN ) {
-				if( e.key.keysym.sym == SDLK_PLUS ) {
-					width++;
-					refresh_plot();
-				} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {
-					width--;
-					refresh_plot();
+			
+			if( queue_length < 5 ) {
+			
+				currentKeyStates = SDL_GetKeyboardState( NULL );			
+					
+				if( e.type == SDL_QUIT ) {
+					exit = 1;
+				} else if( e.type == SDL_MOUSEWHEEL ) {
+				
+					//e.wheel.y is "the amount scrolled vertically, positive 
+					// away from the user and negative toward the user" 
+					// (from http://wiki.libsdl.org/SDL_MouseWheelEvent).
+					//So, if the user scrolls down, the camera will move to right
+					// and viceversa.
+					//TODO: Add an upper limitation to the scrolling.
+				
+					//This occurs when the user uses the mouse wheel.
+					if( e.wheel.y != 0 ) {
+					
+						if( currentKeyStates[ SDL_SCANCODE_LSHIFT ] ) {
+						
+							if( e.wheel.y > 0 ) {
+								width++;
+							} else if( width > 1 ) {
+								width--;
+							}
+						
+							refresh_plot();
+						
+						} else {
+							scroll_speed = BASE_SCROLL_SPEED;
+					
+							if( currentKeyStates[ SDL_SCANCODE_LCTRL ] )
+								scroll_speed /= 3;
+				
+							if( e.wheel.y > 0 )
+								if( position > scroll_speed )
+									scroll_speed *= -1;
+								else
+									scroll_speed = 0;
+				
+							position += scroll_speed;
+							refresh_plot();
+						}
+				
+					}
+				
+				} else if( e.type == SDL_KEYDOWN ) {
+					if( e.key.keysym.sym == SDLK_PLUS ) {
+						width++;
+						refresh_plot();
+					} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {
+						width--;
+						refresh_plot();
+					}
 				}
 			}
+			
+			queue_length++;
 		}
 		
 		SDL_Delay(40);
@@ -167,4 +185,46 @@ int main() {
 	
 	//Shuts down SDL on OpenGL things.
 	SDL_close();
+}
+
+void refresh_plot() {
+	//Cleans the screen
+	glClear( GL_COLOR_BUFFER_BIT );
+	
+	glMatrixMode( GL_PROJECTION );
+	glLoadIdentity();
+	glOrtho( 
+		position + width * 5, 
+		screenWidth + position - width * 5, 
+		screenHeight, 0.0f, 1.0f, -1.0f 
+	);
+	
+	//Plots the time axis.
+	glBegin( GL_LINES );
+		glColor3ub( 150, 150, 150 );
+		glVertex2f( position, screenHeight / 2 );
+		glVertex2f( screenWidth + position, screenHeight / 2 );
+	glEnd();
+	
+	//NOTE: The FFT algorithm which I've talked about here: 
+	// http://giuliom95.tumblr.com/post/134427522354/
+	// will be implemented in those two next cycles.
+	
+	//Plots the left channel in red. 
+	glBegin( GL_LINE_STRIP );
+		glColor3ub( 255, 100, 100 );
+		for( i = 0; i < total_samples; i+=1 ) {
+			glVertex2f( i, screenHeight / 2 + left[i] * DEPTH );
+		} 	
+	glEnd();
+
+	//Plots the right channel in green.
+	glBegin( GL_LINE_STRIP );
+		glColor3ub( 100, 255, 100 );
+		for( i = 0; i < total_samples; i+=1 ) {
+			glVertex2f( i, screenHeight / 2 + right[i] * DEPTH );
+		}	
+	glEnd();	
+	
+	SDL_GL_SwapWindow( gWindow );
 }
