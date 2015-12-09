@@ -17,7 +17,7 @@
 // 1 : 2^16 = DEPTH : SCREEN_HEIGHT 
 #define DEPTH 0.009155273f
 
-//The lenght(in bytes) of the header of a standard WAV file.
+//The length(in bytes) of the header of a standard WAV file.
 #define WAV_HEADER 44
 
 //The two channels of a single file.
@@ -27,15 +27,16 @@ int16_t* right;
 //The number of total 16-bit samples that compose a single channel.
 long total_samples;
 
-//An iterator. It will be used a lot of times, so I've declared it here
+//An iterator. It will be used a lot of times, so I have declared it here
 // once for all.
 int i;
 
 uint32_t position;
 uint16_t width;
 
-void refresh_plot();
-
+//TODO: Add specifications of these two methods.
+void plot();
+void print_info();
 
 int main() {
 	
@@ -60,8 +61,11 @@ int main() {
 	position = 0;
 	width = BASE_WIDTH;
 	
-	//Creates the window and the OpenGL contex.
+	//Creates the window and the OpenGL context.
 	SDL_init();
+	
+	//Initializes the ncurses library.
+	initscr();
 	
 	//Opens the input file.
 	input_file = fopen( "./a.wav", "r" );
@@ -72,7 +76,7 @@ int main() {
 	// cursor position (the EOF) and then it subtracts the bytes used as header 
 	// in the WAV. The resulting number is the amount of bytes of actual data
 	// so, in order to get the samples, it must be divided by 4, because the channels
-	// are two and every samble is made up by 2 bytes (16-bit). 
+	// are two and every sample is made up by 2 bytes (16-bit). 
 	total_samples = ( ftell( input_file ) - WAV_HEADER ) / 4;
 
 	//Brings back the cursor to the head of the file.
@@ -109,7 +113,7 @@ int main() {
 	fclose( input_file );
 		
 	//And now the plotting part.
-	refresh_plot();
+	plot();
 	exit = 0;
 	while( !exit ) {
 		
@@ -128,7 +132,7 @@ int main() {
 					// away from the user and negative toward the user" 
 					// (from http://wiki.libsdl.org/SDL_MouseWheelEvent).
 					//So, if the user scrolls down, the camera will move to right
-					// and viceversa.
+					// and vice-versa.
 					//TODO: Add an upper limitation to the scrolling.
 				
 					//This occurs when the user uses the mouse wheel.
@@ -142,7 +146,7 @@ int main() {
 								width--;
 							}
 						
-							refresh_plot();
+							plot();
 						
 						} else {
 							scroll_speed = BASE_SCROLL_SPEED;
@@ -157,7 +161,7 @@ int main() {
 									scroll_speed = 0;
 				
 							position += scroll_speed;
-							refresh_plot();
+							plot();
 						}
 				
 					}
@@ -165,10 +169,10 @@ int main() {
 				} else if( e.type == SDL_KEYDOWN ) {
 					if( e.key.keysym.sym == SDLK_PLUS ) {
 						width++;
-						refresh_plot();
+						plot();
 					} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {
 						width--;
-						refresh_plot();
+						plot();
 					}
 				}
 			}
@@ -179,20 +183,34 @@ int main() {
 		SDL_Delay(40);
 	}
 	
-	//Deallocates the memory allocated for the channels arrays.
+	//Frees the memory allocated for the channels arrays.
 	free(left);
 	free(right);
+	
+	//Shuts down ncurses.
+	endwin();
 	
 	//Shuts down SDL on OpenGL things.
 	SDL_close();
 }
 
-void refresh_plot() {
+void print_info() {
+	move( 0, 0 );
+	printw( "Position: %i/%i\n", position, total_samples );
+	printw( "Pixels per sample: %i\n", width );
+	refresh();
+}
+
+void plot() {
+	//Prints info on terminal.
+	print_info();
+	
 	//Cleans the screen
 	glClear( GL_COLOR_BUFFER_BIT );
 	
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
+	
 	glOrtho( 
 		position + width * 5, 
 		screenWidth + position - width * 5, 
