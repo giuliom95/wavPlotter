@@ -34,84 +34,28 @@ int i;
 uint32_t position;
 uint16_t width;
 
-//TODO: Add specifications of these two methods.
+//TODO: Add specifications of these methods.
+void start_gui();
+void shut_down();
+void read_wav();
 void plot();
 void print_info();
 
 int main() {
 	
-	//The pointer to the wav file
-	FILE* input_file;
-	
 	SDL_Event e;
-	
 	uint8_t* currentKeyStates;
-	
-	int scroll_speed;
-	
-	
 	short exit, queue_length;
-	
-	//These variables are needed to make the OpenGL and SDL libraries work. 
-	gWindow = NULL;
-	gContext = NULL;
-	screenWidth = SCREEN_WIDTH;
-	screenHeight = SCREEN_HEIGHT;
+		
+	int scroll_speed;
 	
 	position = 0;
 	width = BASE_WIDTH;
 	
-	//Creates the window and the OpenGL context.
-	SDL_init();
+	start_gui();
 	
-	//Initializes the ncurses library.
-	initscr();
+	read_wav( left, right );
 	
-	//Opens the input file.
-	input_file = fopen( "./a.wav", "r" );
-	//Moves the cursor to the EOF.
-	fseek( input_file, 0, SEEK_END );
-	
-	//Calculates the total samples per channel in this way: it reads the actual
-	// cursor position (the EOF) and then it subtracts the bytes used as header 
-	// in the WAV. The resulting number is the amount of bytes of actual data
-	// so, in order to get the samples, it must be divided by 4, because the channels
-	// are two and every sample is made up by 2 bytes (16-bit). 
-	total_samples = ( ftell( input_file ) - WAV_HEADER ) / 4;
-
-	//Brings back the cursor to the head of the file.
-	fseek( input_file, 0, 0 );
-	
-	//Allocates the needed memory for the channels arrays. 
-	left = (int16_t*) calloc( total_samples, sizeof(int16_t) );
-	right = (int16_t*) calloc( total_samples, sizeof(int16_t) );
-	
-	//Skips the header of the file.
-	for( i == 0; i < WAV_HEADER; i++ ) {
-		fgetc( input_file );
-	}
-	
-	//Reads the whole input file and stores its values in the channels arrays.
-	//Here a simple reference on how data is stored in a dual channel
-	// 16-bit WAV file:
-	// 
-	// Decimal:       1094      3302       96       31296      270
-	//                  |         |         |         |         |
-	//                  V         V         V         V         V
-	// Exadecimal:  0x04 0x46 0x0C 0xE6 0x00 0x60 0x7A 0x40 0x01 0x0E ... And so on
-	//              |_______| |_______| |_______| |_______| |_______|
-	// Channel:        Left     Right      Left     Right      Left
-	//
-	//I got this info from: http://soundfile.sapp.org/doc/WaveFormat/ 
-	// Check it out further information.
-	for( i = 0; i < total_samples; i++ ) {
-		left[i] =  (uint8_t)fgetc(input_file) + (uint16_t)( fgetc(input_file) << 8 );
-		right[i] = (uint8_t)fgetc(input_file) + (uint16_t)( fgetc(input_file) << 8 );
-	}
-	
-	//Closes the file.
-	fclose( input_file );
-		
 	//And now the plotting part.
 	plot();
 	exit = 0;
@@ -183,6 +127,24 @@ int main() {
 		SDL_Delay(40);
 	}
 	
+	shut_down();
+}
+
+void start_gui() {
+	//These variables are needed to make the OpenGL and SDL libraries work. 
+	gWindow = NULL;
+	gContext = NULL;
+	screenWidth = SCREEN_WIDTH;
+	screenHeight = SCREEN_HEIGHT;
+	
+	//Creates the window and the OpenGL context.
+	SDL_init();
+	
+	//Initializes the ncurses library.
+	initscr();
+}
+
+void shut_down() {
 	//Frees the memory allocated for the channels arrays.
 	free(left);
 	free(right);
@@ -192,6 +154,57 @@ int main() {
 	
 	//Shuts down SDL on OpenGL things.
 	SDL_close();
+}
+
+void read_wav() {
+	
+	//The pointer to the wav file
+	FILE* input_file;
+			
+	//Opens the input file.
+	input_file = fopen( "./b.wav", "r" );
+	//Moves the cursor to the EOF.
+	fseek( input_file, 0, SEEK_END );
+	
+	//Calculates the total samples per channel in this way: it reads the actual
+	// cursor position (the EOF) and then it subtracts the bytes used as header 
+	// in the WAV. The resulting number is the amount of bytes of actual data
+	// so, in order to get the samples, it must be divided by 4, because the channels
+	// are two and every sample is made up by 2 bytes (16-bit). 
+	total_samples = ( ftell( input_file ) - WAV_HEADER ) / 4;
+
+	//Brings back the cursor to the head of the file.
+	fseek( input_file, 0, 0 );
+	
+	//Allocates the needed memory for the channels arrays. 
+	left = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+	right = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+	
+	//Skips the header of the file.
+	for( i == 0; i < WAV_HEADER; i++ ) {
+		fgetc( input_file );
+	}
+	
+	//Reads the whole input file and stores its values in the channels arrays.
+	//Here a simple reference on how data is stored in a dual channel
+	// 16-bit WAV file:
+	// 
+	// Decimal:       1094      3302       96       31296      270
+	//                  |         |         |         |         |
+	//                  V         V         V         V         V
+	// Exadecimal:  0x04 0x46 0x0C 0xE6 0x00 0x60 0x7A 0x40 0x01 0x0E ... And so on
+	//              |_______| |_______| |_______| |_______| |_______|
+	// Channel:        Left     Right      Left     Right      Left
+	//
+	//I got this info from: http://soundfile.sapp.org/doc/WaveFormat/ 
+	// Check it out further information.
+	for( i = 0; i < total_samples; i++ ) {
+		left[i] =  (uint8_t)fgetc(input_file) + (uint16_t)( fgetc(input_file) << 8 );
+		right[i] = (uint8_t)fgetc(input_file) + (uint16_t)( fgetc(input_file) << 8 );
+	}
+	
+	//Closes the file.
+	fclose( input_file );
 }
 
 void print_info() {
@@ -235,7 +248,7 @@ void plot() {
 			glVertex2f( i, screenHeight / 2 + left[i] * DEPTH );
 		} 	
 	glEnd();
-
+	
 	//Plots the right channel in green.
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
