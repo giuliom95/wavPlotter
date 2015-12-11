@@ -31,138 +31,42 @@ long total_samples;
 // once for all.
 int i;
 
-uint32_t position;
-uint16_t width;
+long position;
+int width;
 
-//TODO: Add specifications of these methods.
-void start_gui();
-void shut_down();
-void read_wav();
+int screen_width, screen_height;
+
+//TODO: Add specifications of these two methods.
 void plot();
 void print_info();
 
 int main() {
 	
+	//The pointer to the wav file
+	FILE* input_file;
+	
 	SDL_Event e;
-	uint8_t* currentKeyStates;
-	short exit, queue_length;
-		
+	
 	int scroll_speed;
+	
+	
+	short exit, queue_length;
+	
+	//These variables are needed to make the OpenGL and SDL libraries work. 
+	screen_width = SCREEN_WIDTH;
+	screen_height = SCREEN_HEIGHT;
 	
 	position = 0;
 	width = BASE_WIDTH;
 	
-	start_gui();
-	
-	read_wav( left, right );
-	
-	//And now the plotting part.
-	plot();
-	exit = 0;
-	while( !exit ) {
-		
-		queue_length = 0;
-		while( SDL_PollEvent( &e ) != 0 ) {
-			
-			if( queue_length < 5 ) {
-			
-				currentKeyStates = SDL_GetKeyboardState( NULL );			
-					
-				if( e.type == SDL_QUIT ) {
-					exit = 1;
-				} else if( e.type == SDL_MOUSEWHEEL ) {
-				
-					//e.wheel.y is "the amount scrolled vertically, positive 
-					// away from the user and negative toward the user" 
-					// (from http://wiki.libsdl.org/SDL_MouseWheelEvent).
-					//So, if the user scrolls down, the camera will move to right
-					// and vice-versa.
-					//TODO: Add an upper limitation to the scrolling.
-				
-					//This occurs when the user uses the mouse wheel.
-					if( e.wheel.y != 0 ) {
-					
-						if( currentKeyStates[ SDL_SCANCODE_LSHIFT ] ) {
-						
-							if( e.wheel.y > 0 ) {
-								width++;
-							} else if( width > 1 ) {
-								width--;
-							}
-						
-							plot();
-						
-						} else {
-							scroll_speed = BASE_SCROLL_SPEED;
-					
-							if( currentKeyStates[ SDL_SCANCODE_LCTRL ] )
-								scroll_speed /= 3;
-				
-							if( e.wheel.y > 0 )
-								if( position > scroll_speed )
-									scroll_speed *= -1;
-								else
-									scroll_speed = 0;
-				
-							position += scroll_speed;
-							plot();
-						}
-				
-					}
-				
-				} else if( e.type == SDL_KEYDOWN ) {
-					if( e.key.keysym.sym == SDLK_PLUS ) {
-						width++;
-						plot();
-					} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {
-						width--;
-						plot();
-					}
-				}
-			}
-			
-			queue_length++;
-		}
-		
-		SDL_Delay(40);
-	}
-	
-	shut_down();
-}
-
-void start_gui() {
-	//These variables are needed to make the OpenGL and SDL libraries work. 
-	gWindow = NULL;
-	gContext = NULL;
-	screenWidth = SCREEN_WIDTH;
-	screenHeight = SCREEN_HEIGHT;
-	
 	//Creates the window and the OpenGL context.
-	SDL_init();
+	SDL_init( screen_width, screen_height );
 	
 	//Initializes the ncurses library.
 	initscr();
-}
-
-void shut_down() {
-	//Frees the memory allocated for the channels arrays.
-	free(left);
-	free(right);
 	
-	//Shuts down ncurses.
-	endwin();
-	
-	//Shuts down SDL on OpenGL things.
-	SDL_close();
-}
-
-void read_wav() {
-	
-	//The pointer to the wav file
-	FILE* input_file;
-			
 	//Opens the input file.
-	input_file = fopen( "./b.wav", "r" );
+	input_file = fopen( "./a.wav", "r" );
 	//Moves the cursor to the EOF.
 	fseek( input_file, 0, SEEK_END );
 	
@@ -205,6 +109,96 @@ void read_wav() {
 	
 	//Closes the file.
 	fclose( input_file );
+		
+	//And now the plotting part.
+	plot();
+	print_info();
+	
+	exit = 0;
+	while( !exit ) {
+		
+		queue_length = 0;
+		while( SDL_PollEvent( &e ) != 0 ) {
+			
+			if( queue_length < 5 ) {
+				
+				char refresh = FALSE;
+				const uint8_t* currentKeyStates = SDL_GetKeyboardState( NULL );			
+					
+				if( e.type == SDL_QUIT ) {
+					exit = 1;
+				} else if( e.type == SDL_MOUSEWHEEL ) {
+				
+					//e.wheel.y is "the amount scrolled vertically, positive 
+					// away from the user and negative toward the user" 
+					// (from http://wiki.libsdl.org/SDL_MouseWheelEvent).
+					//So, if the user scrolls down, the camera will move to right
+					// and vice-versa.
+					//TODO: Add an upper limitation to the scrolling.
+				
+					//This occurs when the user uses the mouse wheel.
+					if( e.wheel.y != 0 ) {
+					
+						if( currentKeyStates[ SDL_SCANCODE_LSHIFT ] ) {
+						
+							if( e.wheel.y > 0 ) {
+								width++;
+							} else if( width > 1 ) {
+								width--;
+							}
+						
+							refresh = TRUE;
+						
+						} else {
+							scroll_speed = BASE_SCROLL_SPEED;
+					
+							if( currentKeyStates[ SDL_SCANCODE_LCTRL ] )
+								scroll_speed /= 3;
+				
+							if( e.wheel.y > 0 )
+								if( position > scroll_speed )
+									scroll_speed *= -1;
+								else
+									scroll_speed = 0;
+				
+							position += scroll_speed;
+							
+							refresh = TRUE;
+						}
+				
+					}
+				
+				} else if( e.type == SDL_KEYDOWN ) {
+					if( e.key.keysym.sym == SDLK_PLUS ) {
+						width++;
+						refresh = TRUE;
+					} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {
+						width--;
+						refresh = TRUE;
+					}
+				}
+				
+				if( refresh ){
+					print_info();
+					plot();
+				}
+			}
+			
+			queue_length++;
+		}
+		
+		SDL_Delay(40);
+	}
+	
+	//Frees the memory allocated for the channels arrays.
+	free(left);
+	free(right);
+	
+	//Shuts down ncurses.
+	endwin();
+	
+	//Shuts down SDL on OpenGL things.
+	SDL_close();
 }
 
 void print_info() {
@@ -215,8 +209,6 @@ void print_info() {
 }
 
 void plot() {
-	//Prints info on terminal.
-	print_info();
 	
 	//Cleans the screen
 	glClear( GL_COLOR_BUFFER_BIT );
@@ -226,15 +218,15 @@ void plot() {
 	
 	glOrtho( 
 		position + width * 5, 
-		screenWidth + position - width * 5, 
-		screenHeight, 0.0f, 1.0f, -1.0f 
+		screen_width + position - width * 5, 
+		screen_height, 0.0f, 1.0f, -1.0f 
 	);
 	
 	//Plots the time axis.
 	glBegin( GL_LINES );
 		glColor3ub( 150, 150, 150 );
-		glVertex2f( position, screenHeight / 2 );
-		glVertex2f( screenWidth + position, screenHeight / 2 );
+		glVertex2f( position, screen_height / 2 );
+		glVertex2f( screen_width + position, screen_height / 2 );
 	glEnd();
 	
 	//NOTE: The FFT algorithm which I've talked about here: 
@@ -245,15 +237,15 @@ void plot() {
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 255, 100, 100 );
 		for( i = 0; i < total_samples; i+=1 ) {
-			glVertex2f( i, screenHeight / 2 + left[i] * DEPTH );
+			glVertex2f( i, screen_height / 2 + left[i] * DEPTH );
 		} 	
 	glEnd();
-	
+
 	//Plots the right channel in green.
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
 		for( i = 0; i < total_samples; i+=1 ) {
-			glVertex2f( i, screenHeight / 2 + right[i] * DEPTH );
+			glVertex2f( i, screen_height / 2 + right[i] * DEPTH );
 		}	
 	glEnd();	
 	
