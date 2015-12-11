@@ -1,8 +1,11 @@
 #include "SDL.h"
 
-int SDL_init() {
+int SDL_init( int screen_w, int screen_h ) {
 	//Initialization flag
 	int success = TRUE;
+	
+	gWindow = NULL;
+	gContext = NULL;
 
 	//Initialize SDL
 	if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
@@ -18,7 +21,7 @@ int SDL_init() {
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 		
 		//Create window
-		gWindow = SDL_CreateWindow( "wavPlotter", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenWidth, screenHeight, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN );
+		gWindow = SDL_CreateWindow( "wavPlotter", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screen_w, screen_h, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN );
 		if( gWindow == NULL ) {
 			printf( "Window could not be created! SDL Error: %s\n", SDL_GetError() );
 			success = FALSE;
@@ -69,7 +72,6 @@ int SDL_initGL() {
 	//Initialize Projection Matrix
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
-	glOrtho( 0.0, screenWidth, screenHeight, 0.0, 1.0, -1.0 );
 	
 	//Check for error
 	error = glGetError();

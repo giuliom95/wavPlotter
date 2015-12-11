@@ -31,8 +31,10 @@ long total_samples;
 // once for all.
 int i;
 
-uint32_t position;
-uint16_t width;
+long position;
+int width;
+
+int screen_width, screen_height;
 
 //TODO: Add specifications of these two methods.
 void plot();
@@ -45,24 +47,20 @@ int main() {
 	
 	SDL_Event e;
 	
-	uint8_t* currentKeyStates;
-	
 	int scroll_speed;
 	
 	
 	short exit, queue_length;
 	
 	//These variables are needed to make the OpenGL and SDL libraries work. 
-	gWindow = NULL;
-	gContext = NULL;
-	screenWidth = SCREEN_WIDTH;
-	screenHeight = SCREEN_HEIGHT;
+	screen_width = SCREEN_WIDTH;
+	screen_height = SCREEN_HEIGHT;
 	
 	position = 0;
 	width = BASE_WIDTH;
 	
 	//Creates the window and the OpenGL context.
-	SDL_init();
+	SDL_init( screen_width, screen_height );
 	
 	//Initializes the ncurses library.
 	initscr();
@@ -114,6 +112,8 @@ int main() {
 		
 	//And now the plotting part.
 	plot();
+	print_info();
+	
 	exit = 0;
 	while( !exit ) {
 		
@@ -121,8 +121,9 @@ int main() {
 		while( SDL_PollEvent( &e ) != 0 ) {
 			
 			if( queue_length < 5 ) {
-			
-				currentKeyStates = SDL_GetKeyboardState( NULL );			
+				
+				char refresh = FALSE;
+				const uint8_t* currentKeyStates = SDL_GetKeyboardState( NULL );			
 					
 				if( e.type == SDL_QUIT ) {
 					exit = 1;
@@ -146,7 +147,7 @@ int main() {
 								width--;
 							}
 						
-							plot();
+							refresh = TRUE;
 						
 						} else {
 							scroll_speed = BASE_SCROLL_SPEED;
@@ -161,7 +162,8 @@ int main() {
 									scroll_speed = 0;
 				
 							position += scroll_speed;
-							plot();
+							
+							refresh = TRUE;
 						}
 				
 					}
@@ -169,11 +171,16 @@ int main() {
 				} else if( e.type == SDL_KEYDOWN ) {
 					if( e.key.keysym.sym == SDLK_PLUS ) {
 						width++;
-						plot();
+						refresh = TRUE;
 					} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {
 						width--;
-						plot();
+						refresh = TRUE;
 					}
+				}
+				
+				if( refresh ){
+					print_info();
+					plot();
 				}
 			}
 			
@@ -202,8 +209,6 @@ void print_info() {
 }
 
 void plot() {
-	//Prints info on terminal.
-	print_info();
 	
 	//Cleans the screen
 	glClear( GL_COLOR_BUFFER_BIT );
@@ -213,15 +218,15 @@ void plot() {
 	
 	glOrtho( 
 		position + width * 5, 
-		screenWidth + position - width * 5, 
-		screenHeight, 0.0f, 1.0f, -1.0f 
+		screen_width + position - width * 5, 
+		screen_height, 0.0f, 1.0f, -1.0f 
 	);
 	
 	//Plots the time axis.
 	glBegin( GL_LINES );
 		glColor3ub( 150, 150, 150 );
-		glVertex2f( position, screenHeight / 2 );
-		glVertex2f( screenWidth + position, screenHeight / 2 );
+		glVertex2f( position, screen_height / 2 );
+		glVertex2f( screen_width + position, screen_height / 2 );
 	glEnd();
 	
 	//NOTE: The FFT algorithm which I've talked about here: 
@@ -232,7 +237,7 @@ void plot() {
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 255, 100, 100 );
 		for( i = 0; i < total_samples; i+=1 ) {
-			glVertex2f( i, screenHeight / 2 + left[i] * DEPTH );
+			glVertex2f( i, screen_height / 2 + left[i] * DEPTH );
 		} 	
 	glEnd();
 
@@ -240,7 +245,7 @@ void plot() {
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
 		for( i = 0; i < total_samples; i+=1 ) {
-			glVertex2f( i, screenHeight / 2 + right[i] * DEPTH );
+			glVertex2f( i, screen_height / 2 + right[i] * DEPTH );
 		}	
 	glEnd();	
 	
