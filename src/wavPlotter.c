@@ -139,15 +139,17 @@ int main() {
 						} else {
 							scroll_speed = BASE_SCROLL_SPEED;
 					
-							if( currentKeyStates[ SDL_SCANCODE_LCTRL ] )
+							if( currentKeyStates[ SDL_SCANCODE_LCTRL ] ) {
 								scroll_speed /= 3;
-				
-							if( e.wheel.y > 0 )
+							}
+							
+							if( e.wheel.y > 0 ) {
 								if( position > scroll_speed )
 									scroll_speed *= -1;
 								else
 									scroll_speed = 0;
-				
+							}
+							
 							position += scroll_speed;
 							
 							refresh = TRUE;
@@ -271,7 +273,7 @@ void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples )
 	int i;
 	
 	//Skips the header of the file.
-	for( i == 0; i < WAV_HEADER; i++ ) {
+	for( i = 0; i < WAV_HEADER; i++ ) {
 		fgetc( fd );
 	}
 	
