@@ -1,6 +1,7 @@
 //The main file for the wavPlotter program.
 
-#include "SDL.h"
+#include "includes.h"
+#include "graphics.h"
 
 //The window initial dimensions
 #define SCREEN_WIDTH 800
@@ -127,14 +128,18 @@ int main() {
 					if( e.wheel.y != 0 ) {
 					
 						if( currentKeyStates[ SDL_SCANCODE_LSHIFT ] ) {
+							
+							if( e.wheel.y != 0 ) {
+							
+								if( e.wheel.y > 0 && width < 79 ) {
+									width++;
+								} else if( width > 1 ) {
+									width--;
+								}
 						
-							if( e.wheel.y > 0 ) {
-								width++;
-							} else if( width > 1 ) {
-								width--;
+								refresh = TRUE;
+							
 							}
-						
-							refresh = TRUE;
 						
 						} else {
 							scroll_speed = BASE_SCROLL_SPEED;
@@ -146,8 +151,10 @@ int main() {
 							if( e.wheel.y > 0 ) {
 								if( position > scroll_speed )
 									scroll_speed *= -1;
-								else
+								else {
 									scroll_speed = 0;
+									position = 0;
+								}
 							}
 							
 							position += scroll_speed;
@@ -158,7 +165,7 @@ int main() {
 					}
 				
 				} else if( e.type == SDL_KEYDOWN ) {
-					if( e.key.keysym.sym == SDLK_PLUS ) {
+					if( e.key.keysym.sym == SDLK_PLUS && width < 79 ) {
 						width++;
 						refresh = TRUE;
 					} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {

@@ -1,4 +1,4 @@
-#include "SDL.h"
+#include "graphics.h"
 
 int SDL_init( int screen_w, int screen_h ) {
 	//Initialization flag

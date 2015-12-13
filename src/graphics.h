@@ -1,5 +1,5 @@
-#ifndef SDL_H
-#define SDL_H
+#ifndef GRAPHICS_H
+#define GRAPHICS_H
 
 #include "includes.h"
 
