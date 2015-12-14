@@ -22,20 +22,20 @@
 #define WAV_HEADER 44
 
 //TODO: Add specifications of these two methods.
-void plot( 
-	int16_t* left_ch, 
-	int16_t* right_ch, 
-	long pos, 
-	long samples, 
+void plot(
+	int16_t* left_ch,
+	int16_t* right_ch,
+	long pos,
+	long samples,
 	int pixel_per_sample,
 	int screen_w,
-	int screen_h 
+	int screen_h
 );
 void print_info( long pos, long samples, int pixel_per_sample );
 
 /* Returns the samples of a given WAVE file.
  * Pre: "fd" is a pointer to a 16-bit stereo WAVE file opened by the fopen function.
- * Post: The return is the samples number of the given WAVE. 
+ * Post: The return is the samples number of the given WAVE.
  *  Returns -1 in case of error.
  */
 int get_samples_number( FILE* fd );
@@ -46,7 +46,7 @@ int get_samples_number( FILE* fd );
  *  "samples" is the number returned by the "int get_samples_number( FILE* fd )"
  *   function.
  * Post: "left_ch" and "right_ch" are filled with the samples of the given WAVE file.
- */  
+ */
 void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples );
 
 int main() {

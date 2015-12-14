@@ -1,8 +1,16 @@
-CODE_DIR = src
+WAV_PLOTTER_DIR = src
+FFTW_DIR = fftw_src
 
 .PHONY: wavPlotter
 
 wavPlotter:
-	$(MAKE) -C $(CODE_DIR)
-	mv $(CODE_DIR)/wavPlotter ./
-	rm $(CODE_DIR)/*.o
+	$(MAKE) -C $(WAV_PLOTTER_DIR)
+	mv $(WAV_PLOTTER_DIR)/wavPlotter ./
+	rm $(WAV_PLOTTER_DIR)/*.o
+
+.PHONY: fftw
+
+fftw:
+	$(MAKE) -C $(FFTW_DIR)
+	mv $(FFTW_DIR)/fftw ./
+	rm $(FFTW_DIR)/*.o
