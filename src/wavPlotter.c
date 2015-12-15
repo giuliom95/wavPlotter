@@ -33,6 +33,16 @@ void plot(
 );
 void print_info( long pos, long samples, int pixel_per_sample );
 
+void error_callback( int error, const char* description );
+
+static void GLFW_key_callback( 
+	GLFWwindow* window, 
+	int key, 
+	int scancode, 
+	int action, 
+	int mods 
+);
+
 /* Returns the samples of a given WAVE file.
  * Pre: "fd" is a pointer to a 16-bit stereo WAVE file opened by the fopen function.
  * Post: The return is the samples number of the given WAVE.
@@ -49,6 +59,8 @@ int get_samples_number( FILE* fd );
  */
 void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples );
 
+long position;
+
 int main() {
 	
 	//The two channels of a single file.
@@ -58,7 +70,6 @@ int main() {
 	//The number of total 16-bit samples that compose a single channel.
 	long total_samples;
 
-	long position;
 	int width;
 	
 	const int screen_width = SCREEN_WIDTH;
@@ -67,19 +78,17 @@ int main() {
 	//The pointer to the wav file
 	FILE* input_file;
 	
-	SDL_Event e;
-	
-	int scroll_speed;
-	
-	short exit, queue_length;
-	
 	position = 0;
 	width = BASE_WIDTH;
 	
+	
 	//Creates the window and the OpenGL context.
-	if( !SDL_init( screen_width, screen_height ) ) {
+	glfwSetErrorCallback( error_callback );
+	if( !GLFW_init( screen_width, screen_height ) ) {
+		fprintf( stderr, "Error while initializing GLFW!\n" );
 		return -1;	
 	}
+	glfwSetKeyCallback( GLFW_window, GLFW_key_callback );
 	
 	//Initializes the ncurses library.
 	initscr();
@@ -102,88 +111,12 @@ int main() {
 	plot( left, right, position, total_samples, width, screen_width, screen_height );
 	print_info( position, total_samples, width );
 	
-	exit = 0;
-	while( !exit ) {
+	while( !glfwWindowShouldClose( GLFW_window ) ) {
 		
-		queue_length = 0;
-		while( SDL_PollEvent( &e ) != 0 ) {
-			
-			if( queue_length < 5 ) {
-				
-				char refresh = FALSE;
-				const uint8_t* currentKeyStates = SDL_GetKeyboardState( NULL );			
-					
-				if( e.type == SDL_QUIT ) {
-					exit = 1;
-				} else if( e.type == SDL_MOUSEWHEEL ) {
-				
-					//e.wheel.y is "the amount scrolled vertically, positive 
-					// away from the user and negative toward the user" 
-					// (from http://wiki.libsdl.org/SDL_MouseWheelEvent).
-					//So, if the user scrolls down, the camera will move to right
-					// and vice-versa.
-					//TODO: Add an upper limitation to the scrolling.
-				
-					//This occurs when the user uses the mouse wheel.
-					if( e.wheel.y != 0 ) {
-					
-						if( currentKeyStates[ SDL_SCANCODE_LSHIFT ] ) {
-							
-							if( e.wheel.y != 0 ) {
-							
-								if( e.wheel.y > 0 && width < 79 ) {
-									width++;
-								} else if( width > 1 ) {
-									width--;
-								}
-						
-								refresh = TRUE;
-							
-							}
-						
-						} else {
-							scroll_speed = BASE_SCROLL_SPEED;
-					
-							if( currentKeyStates[ SDL_SCANCODE_LCTRL ] ) {
-								scroll_speed /= 3;
-							}
-							
-							if( e.wheel.y > 0 ) {
-								if( position > scroll_speed )
-									scroll_speed *= -1;
-								else {
-									scroll_speed = 0;
-									position = 0;
-								}
-							}
-							
-							position += scroll_speed;
-							
-							refresh = TRUE;
-						}
-				
-					}
-				
-				} else if( e.type == SDL_KEYDOWN ) {
-					if( e.key.keysym.sym == SDLK_PLUS && width < 79 ) {
-						width++;
-						refresh = TRUE;
-					} else if( e.key.keysym.sym == SDLK_MINUS && width > 1 ) {
-						width--;
-						refresh = TRUE;
-					}
-				}
-				
-				if( refresh ){
-					print_info( position, total_samples, width );
-					plot( left, right, position, total_samples, width, screen_width, screen_height );
-				}
-			}
-			
-			queue_length++;
-		}
+		print_info( position, total_samples, width );
+		plot( left, right, position, total_samples, width, screen_width, screen_height );
 		
-		SDL_Delay(40);
+		 glfwWaitEvents();
 	}
 	
 	//Frees the memory allocated for the channels arrays.
@@ -193,8 +126,8 @@ int main() {
 	//Shuts down ncurses.
 	endwin();
 	
-	//Shuts down SDL on OpenGL things.
-	SDL_close();
+	//Shuts down GLFW and OpenGL.
+	GLFW_close();
 }
 
 void print_info( long pos, long samples, int pixel_per_sample ){
@@ -222,16 +155,16 @@ void plot(
 	glLoadIdentity();
 	
 	glOrtho( 
-		pos + pixel_per_sample * 5, 
-		screen_w + pos - pixel_per_sample * 5, 
+		pixel_per_sample * 5, 
+		screen_w - pixel_per_sample * 5, 
 		screen_h, 0.0f, 1.0f, -1.0f 
 	);
 	
 	//Plots the time axis.
 	glBegin( GL_LINES );
 		glColor3ub( 150, 150, 150 );
-		glVertex2f( pos, screen_h / 2 );
-		glVertex2f( screen_w + pos, screen_h / 2 );
+		glVertex2f( 0, screen_h / 2 );
+		glVertex2f( screen_w, screen_h / 2 );
 	glEnd();
 	
 	//NOTE: The FFT algorithm which I've talked about here: 
@@ -242,7 +175,7 @@ void plot(
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 255, 100, 100 );
 		for( i = 0; i < samples; i+=1 ) {
-			glVertex2f( i, screen_h / 2 + left_ch[i] * DEPTH );
+			glVertex2f( i - pos, screen_h / 2 + left_ch[i] * DEPTH );
 		} 	
 	glEnd();
 
@@ -250,11 +183,11 @@ void plot(
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
 		for( i = 0; i < samples; i+=1 ) {
-			glVertex2f( i, screen_h / 2 + right_ch[i] * DEPTH );
+			glVertex2f( i - pos, screen_h / 2 + right_ch[i] * DEPTH );
 		}	
 	glEnd();	
 	
-	SDL_GL_SwapWindow( gWindow );
+	glfwSwapBuffers( GLFW_window );
 }
 
 int get_samples_number( FILE* fd ){
@@ -303,3 +236,15 @@ void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples )
 	}
 	
 } 
+
+void error_callback( int error, const char* description ){
+    fputs( description, stderr );
+}
+
+static void GLFW_key_callback( GLFWwindow* window, int key, int scancode, int action, int mods ){
+
+    if( key == GLFW_KEY_RIGHT && ( action == GLFW_REPEAT || action == GLFW_PRESS ) ) {
+    	position+= 10;
+    }
+        
+}
