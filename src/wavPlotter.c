@@ -60,6 +60,7 @@ int get_samples_number( FILE* fd );
 void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples );
 
 long position;
+int width;
 
 int main() {
 	
@@ -69,8 +70,6 @@ int main() {
 	
 	//The number of total 16-bit samples that compose a single channel.
 	long total_samples;
-
-	int width;
 	
 	const int screen_width = SCREEN_WIDTH;
 	const int screen_height = SCREEN_HEIGHT;
@@ -174,7 +173,7 @@ void plot(
 	//Plots the left channel in red. 
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 255, 100, 100 );
-		for( i = 0; i < samples; i+=1 ) {
+		for( i = pos; i < pos + screen_w; i+=1 ) {
 			glVertex2f( i - pos, screen_h / 2 + left_ch[i] * DEPTH );
 		} 	
 	glEnd();
@@ -182,7 +181,7 @@ void plot(
 	//Plots the right channel in green.
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
-		for( i = 0; i < samples; i+=1 ) {
+		for( i = pos; i < pos + screen_w; i+=1 ) {
 			glVertex2f( i - pos, screen_h / 2 + right_ch[i] * DEPTH );
 		}	
 	glEnd();	
@@ -242,9 +241,25 @@ void error_callback( int error, const char* description ){
 }
 
 static void GLFW_key_callback( GLFWwindow* window, int key, int scancode, int action, int mods ){
-
-    if( key == GLFW_KEY_RIGHT && ( action == GLFW_REPEAT || action == GLFW_PRESS ) ) {
-    	position+= 10;
-    }
-        
+	
+	if( action == GLFW_REPEAT || action == GLFW_PRESS ){
+		switch( key ) {
+			case GLFW_KEY_RIGHT:
+				position += BASE_SCROLL_SPEED;
+				break;
+			case GLFW_KEY_LEFT:
+				position -= BASE_SCROLL_SPEED;
+				
+				if( position < 0 ) {
+					position = 0;
+				}
+				break;
+			case GLFW_KEY_S:
+				width++;
+				break;
+			case GLFW_KEY_A:
+				width--;
+				break;
+		}
+	}
 }
