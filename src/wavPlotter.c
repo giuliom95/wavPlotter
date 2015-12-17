@@ -7,11 +7,13 @@
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
-#define BASE_SCROLL_SPEED 100
+#define BASE_SCROLL_SPEED 50
 
 //These two define the axis ratio of the plot.
 //BASE_WIDTH indicates the initial distance (in pixels) between two samples.
 #define BASE_WIDTH 1
+
+#define MAX_WIDTH 79
 
 //DEPTH is the amplitude multiplier of the signal. 
 //It squeezes the plot into the window. It was obtained by the proportion:
@@ -42,6 +44,8 @@ static void GLFW_key_callback(
 	int action, 
 	int mods 
 );
+
+void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset );
 
 /* Returns the samples of a given WAVE file.
  * Pre: "fd" is a pointer to a 16-bit stereo WAVE file opened by the fopen function.
@@ -88,6 +92,7 @@ int main() {
 		return -1;	
 	}
 	glfwSetKeyCallback( GLFW_window, GLFW_key_callback );
+	glfwSetScrollCallback( GLFW_window, GLFW_scroll_callback );
 	
 	//Initializes the ncurses library.
 	initscr();
@@ -105,12 +110,18 @@ int main() {
 	
 	//Closes the file.
 	fclose( input_file );
-		
-	//And now the plotting part.
-	plot( left, right, position, total_samples, width, screen_width, screen_height );
-	print_info( position, total_samples, width );
 	
 	while( !glfwWindowShouldClose( GLFW_window ) ) {
+		
+		if( position < 0 )
+			position = 0;
+		else if( position > total_samples )
+			position = total_samples;
+		
+		if( width < 0 )
+			width = 0;
+		else if( width > MAX_WIDTH )
+			width = MAX_WIDTH;
 		
 		print_info( position, total_samples, width );
 		plot( left, right, position, total_samples, width, screen_width, screen_height );
@@ -145,7 +156,7 @@ void plot(
 	int screen_w,
 	int screen_h 
 ) {
-	int i;
+	int i, upper_limit;
 	
 	//Cleans the screen
 	glClear( GL_COLOR_BUFFER_BIT );
@@ -166,14 +177,12 @@ void plot(
 		glVertex2f( screen_w, screen_h / 2 );
 	glEnd();
 	
-	//NOTE: The FFT algorithm which I've talked about here: 
-	// http://giuliom95.tumblr.com/post/134427522354/
-	// will be implemented in those two next cycles.
+	upper_limit = ( pos + screen_w < samples )?( pos + screen_w ):( samples );	
 	
 	//Plots the left channel in red. 
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 255, 100, 100 );
-		for( i = pos; i < pos + screen_w; i+=1 ) {
+		for( i = pos; i < upper_limit; i+=1 ) {
 			glVertex2f( i - pos, screen_h / 2 + left_ch[i] * DEPTH );
 		} 	
 	glEnd();
@@ -181,7 +190,7 @@ void plot(
 	//Plots the right channel in green.
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
-		for( i = pos; i < pos + screen_w; i+=1 ) {
+		for( i = pos; i < upper_limit; i+=1 ) {
 			glVertex2f( i - pos, screen_h / 2 + right_ch[i] * DEPTH );
 		}	
 	glEnd();	
@@ -249,10 +258,6 @@ static void GLFW_key_callback( GLFWwindow* window, int key, int scancode, int ac
 				break;
 			case GLFW_KEY_LEFT:
 				position -= BASE_SCROLL_SPEED;
-				
-				if( position < 0 ) {
-					position = 0;
-				}
 				break;
 			case GLFW_KEY_S:
 				width++;
@@ -263,3 +268,13 @@ static void GLFW_key_callback( GLFWwindow* window, int key, int scancode, int ac
 		}
 	}
 }
+
+void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset ){
+
+	if( glfwGetKey( window, GLFW_KEY_LEFT_SHIFT ) == GLFW_PRESS ){
+		width += (int) yoffset;
+	} else {
+		position -= (long) yoffset * BASE_SCROLL_SPEED;
+	}
+}
+
