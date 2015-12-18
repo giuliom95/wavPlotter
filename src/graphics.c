@@ -16,6 +16,8 @@ int GLFW_init( int screen_w, int screen_h ) {
 	glfwWindowHint( GLFW_AUX_BUFFERS, 1 );
 	glfwWindowHint( GLFW_SAMPLES, 4 );
 	
+	glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
+	
 	if( !initGL() ) {
 		fprintf( stderr, "Error in the OpenGL init!\n");
 		success = FALSE;

@@ -9,6 +9,8 @@
 
 #define BASE_SCROLL_SPEED 50
 
+#define SAMPLE_FREQUENCY 44100
+
 //These two define the axis ratio of the plot.
 //BASE_WIDTH indicates the initial distance (in pixels) between two samples.
 #define BASE_WIDTH 1
@@ -23,7 +25,9 @@
 //The length(in bytes) of the header of a standard WAV file.
 #define WAV_HEADER 44
 
-//TODO: Add specifications of these two methods.
+//TODO: Add specifications of these methods.
+void close_all();
+void print_info( long pos, long samples, int pixel_per_sample );
 void plot(
 	int16_t* left_ch,
 	int16_t* right_ch,
@@ -33,19 +37,6 @@ void plot(
 	int screen_w,
 	int screen_h
 );
-void print_info( long pos, long samples, int pixel_per_sample );
-
-void error_callback( int error, const char* description );
-
-static void GLFW_key_callback( 
-	GLFWwindow* window, 
-	int key, 
-	int scancode, 
-	int action, 
-	int mods 
-);
-
-void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset );
 
 /* Returns the samples of a given WAVE file.
  * Pre: "fd" is a pointer to a 16-bit stereo WAVE file opened by the fopen function.
@@ -63,10 +54,23 @@ int get_samples_number( FILE* fd );
  */
 void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples );
 
+//TODO: Add specifications of these methods.
+void error_callback( int error, const char* description );
+
+static void GLFW_key_callback( 
+	GLFWwindow* window, 
+	int key, 
+	int scancode, 
+	int action, 
+	int mods 
+);
+
+void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset );
+
 long position;
 int width;
 
-int main() {
+int main( int argc, char **argv ){
 	
 	//The two channels of a single file.
 	int16_t* left;
@@ -98,8 +102,13 @@ int main() {
 	initscr();
 	
 	//Opens the input file.
-	input_file = fopen( "./a.wav", "r" );
-	
+	if( argc < 2 ) {
+		close_all();
+		fprintf( stderr, "Error: No input file provided!\n" );
+		return -1;
+	} else
+		input_file = fopen( argv[1], "r" );
+		
 	total_samples = get_samples_number( input_file );
 	
 	//Allocates the needed memory for the channels arrays. 
@@ -116,7 +125,7 @@ int main() {
 		if( position < 0 )
 			position = 0;
 		else if( position > total_samples )
-			position = total_samples;
+			position = total_samples - 1;
 		
 		if( width < 0 )
 			width = 0;
@@ -133,6 +142,10 @@ int main() {
 	free(left);
 	free(right);
 	
+	close_all();
+}
+
+void close_all() {
 	//Shuts down ncurses.
 	endwin();
 	
@@ -142,8 +155,13 @@ int main() {
 
 void print_info( long pos, long samples, int pixel_per_sample ){
 	move( 0, 0 );
-	printw( "Position: %i/%i\n", pos, samples );
-	printw( "Pixels per sample: %i\n", pixel_per_sample );
+	printw(
+		"Position: %i/%i (%fs/%fs)\n", 
+		pos, samples, 
+		(double) pos / SAMPLE_FREQUENCY, 
+		(double) samples / SAMPLE_FREQUENCY 
+	);
+	printw( "Zoom level: %i\n", pixel_per_sample );
 	refresh();
 }
 
@@ -156,7 +174,9 @@ void plot(
 	int screen_w,
 	int screen_h 
 ) {
-	int i, upper_limit;
+	int i;
+	int half_screen_w = screen_w / 2;
+	int half_screen_h = screen_h / 2;
 	
 	//Cleans the screen
 	glClear( GL_COLOR_BUFFER_BIT );
@@ -173,25 +193,25 @@ void plot(
 	//Plots the time axis.
 	glBegin( GL_LINES );
 		glColor3ub( 150, 150, 150 );
-		glVertex2f( 0, screen_h / 2 );
-		glVertex2f( screen_w, screen_h / 2 );
+		glVertex2f( 0, half_screen_h );
+		glVertex2f( screen_w, half_screen_h );
 	glEnd();
-	
-	upper_limit = ( pos + screen_w < samples )?( pos + screen_w ):( samples );	
 	
 	//Plots the left channel in red. 
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 255, 100, 100 );
-		for( i = pos; i < upper_limit; i+=1 ) {
-			glVertex2f( i - pos, screen_h / 2 + left_ch[i] * DEPTH );
+		for( i = pos - half_screen_w; i < pos + half_screen_w; i++ ) {
+			if( i >= 0 && i < samples )
+				glVertex2f( i - pos + half_screen_w, half_screen_h + left_ch[i] * DEPTH );
 		} 	
 	glEnd();
 
 	//Plots the right channel in green.
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
-		for( i = pos; i < upper_limit; i+=1 ) {
-			glVertex2f( i - pos, screen_h / 2 + right_ch[i] * DEPTH );
+		for( i = pos - half_screen_w; i < pos + half_screen_w; i++ ) {
+			if( i >= 0 && i < samples )
+				glVertex2f( i - pos + half_screen_w, half_screen_h + right_ch[i] * DEPTH );
 		}	
 	glEnd();	
 	
@@ -274,7 +294,10 @@ void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset ){
 	if( glfwGetKey( window, GLFW_KEY_LEFT_SHIFT ) == GLFW_PRESS ){
 		width += (int) yoffset;
 	} else {
-		position -= (long) yoffset * BASE_SCROLL_SPEED;
+		if( glfwGetKey( window, GLFW_KEY_LEFT_ALT ) == GLFW_PRESS )
+			position -= (long) yoffset * BASE_SCROLL_SPEED * 10;
+		else 
+			position -= (long) yoffset * BASE_SCROLL_SPEED;
 	}
 }
 

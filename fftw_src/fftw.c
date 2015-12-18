@@ -91,6 +91,9 @@ int main() {
 	c2r = fftw_plan_dft_c2r_1d( screen_width, spectrum, fftw_left, FFTW_ESTIMATE );
 	
 	fftw_execute(r2c);
+	
+	printf( "%f + %fj\n", spectrum[ total_samples / 2 ][0], spectrum[ total_samples / 2 ][1] ); 
+	
 	fftw_execute(c2r);
 	
 	//Cleans the screen
