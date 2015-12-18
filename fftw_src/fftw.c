@@ -126,7 +126,7 @@ int main() {
 		} 	
 	glEnd();
 	
-	SDL_GL_SwapWindow( gWindow );
+	SDL_GL_SwapBuffers();
 	
 	exit = 0;
 	while( !exit ) {
