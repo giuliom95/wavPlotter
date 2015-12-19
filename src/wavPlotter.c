@@ -55,7 +55,7 @@ int get_samples_number( FILE* fd );
 void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples );
 
 //TODO: Add specifications of these methods.
-void error_callback( int error, const char* description );
+void GLFW_error_callback( int error, const char* description );
 
 static void GLFW_key_callback( 
 	GLFWwindow* window, 
@@ -90,7 +90,7 @@ int main( int argc, char **argv ){
 	
 	
 	//Creates the window and the OpenGL context.
-	glfwSetErrorCallback( error_callback );
+	glfwSetErrorCallback( GLFW_error_callback );
 	if( !GLFW_init( screen_width, screen_height ) ) {
 		fprintf( stderr, "Error while initializing GLFW!\n" );
 		return -1;	
@@ -153,7 +153,7 @@ void close_all() {
 	GLFW_close();
 }
 
-void print_info( long pos, long samples, int pixel_per_sample ){
+void print_info( long pos, long samples, int zoom ){
 	move( 0, 0 );
 	printw(
 		"Position: %i/%i (%fs/%fs)\n", 
@@ -161,7 +161,7 @@ void print_info( long pos, long samples, int pixel_per_sample ){
 		(double) pos / SAMPLE_FREQUENCY, 
 		(double) samples / SAMPLE_FREQUENCY 
 	);
-	printw( "Zoom level: %i\n", pixel_per_sample );
+	printw( "Zoom level: %i\n", zoom );
 	refresh();
 }
 
@@ -170,7 +170,7 @@ void plot(
 	int16_t* right_ch, 
 	long pos, 
 	long samples, 
-	int pixel_per_sample,
+	int zoom,
 	int screen_w,
 	int screen_h 
 ) {
@@ -185,8 +185,8 @@ void plot(
 	glLoadIdentity();
 	
 	glOrtho( 
-		pixel_per_sample * 5, 
-		screen_w - pixel_per_sample * 5, 
+		zoom * 5, 
+		screen_w - zoom * 5, 
 		screen_h, 0.0f, 1.0f, -1.0f 
 	);
 	
@@ -200,7 +200,7 @@ void plot(
 	//Plots the left channel in red. 
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 255, 100, 100 );
-		for( i = pos - half_screen_w; i < pos + half_screen_w; i++ ) {
+		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
 			if( i >= 0 && i < samples )
 				glVertex2f( i - pos + half_screen_w, half_screen_h + left_ch[i] * DEPTH );
 		} 	
@@ -209,7 +209,7 @@ void plot(
 	//Plots the right channel in green.
 	glBegin( GL_LINE_STRIP );
 		glColor3ub( 100, 255, 100 );
-		for( i = pos - half_screen_w; i < pos + half_screen_w; i++ ) {
+		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
 			if( i >= 0 && i < samples )
 				glVertex2f( i - pos + half_screen_w, half_screen_h + right_ch[i] * DEPTH );
 		}	
@@ -265,7 +265,7 @@ void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples )
 	
 } 
 
-void error_callback( int error, const char* description ){
+void GLFW_error_callback( int error, const char* description ){
     fputs( description, stderr );
 }
 
