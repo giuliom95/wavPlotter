@@ -1,74 +1,5 @@
 //The main file for the wavPlotter program.
-
-#include "includes.h"
-#include "graphics.h"
-
-//The window initial dimensions
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
-
-#define BASE_SCROLL_SPEED 50
-
-#define SAMPLE_FREQUENCY 44100
-
-//These two define the axis ratio of the plot.
-//BASE_WIDTH indicates the initial distance (in pixels) between two samples.
-#define BASE_WIDTH 1
-
-#define MAX_WIDTH 79
-
-//DEPTH is the amplitude multiplier of the signal. 
-//It squeezes the plot into the window. It was obtained by the proportion:
-// 1 : 2^16 = DEPTH : SCREEN_HEIGHT 
-#define DEPTH 0.009155273f
-
-//The length(in bytes) of the header of a standard WAV file.
-#define WAV_HEADER 44
-
-//TODO: Add specifications of these methods.
-void close_all();
-void print_info( long pos, long samples, int pixel_per_sample );
-void plot(
-	int16_t* left_ch,
-	int16_t* right_ch,
-	long pos,
-	long samples,
-	int pixel_per_sample,
-	int screen_w,
-	int screen_h
-);
-
-/* Returns the samples of a given WAVE file.
- * Pre: "fd" is a pointer to a 16-bit stereo WAVE file opened by the fopen function.
- * Post: The return is the samples number of the given WAVE.
- *  Returns -1 in case of error.
- */
-int get_samples_number( FILE* fd );
-
-/* Reads data from a 16-bit stereo WAVE file and stores it in two arrays.
- * Pre: "fd" is a pointer to a 16-bit stereo WAVE file opened by the fopen function.
- *  "left_ch" and "right_ch" are two arrays with as many elements as samples.
- *  "samples" is the number returned by the "int get_samples_number( FILE* fd )"
- *   function.
- * Post: "left_ch" and "right_ch" are filled with the samples of the given WAVE file.
- */
-void read_samples( FILE* fd, int16_t* left_ch, int16_t* right_ch, long samples );
-
-//TODO: Add specifications of these methods.
-void GLFW_error_callback( int error, const char* description );
-
-static void GLFW_key_callback( 
-	GLFWwindow* window, 
-	int key, 
-	int scancode, 
-	int action, 
-	int mods 
-);
-
-void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset );
-
-long position;
-int width;
+#include "wavPlotter.h"
 
 int main( int argc, char **argv ){
 	
@@ -88,6 +19,23 @@ int main( int argc, char **argv ){
 	position = 0;
 	width = BASE_WIDTH;
 	
+	right_color = DEF_RIGHT_COLOR;
+	left_color = DEF_LEFT_COLOR;
+	
+	wav_path = NULL;
+	
+	for( argc--; argc > 0; argc-- ) {
+		if( parse_arg( argv[ argc ] ) != 0 ) {
+			return -1;
+		}
+	}
+	
+	if( wav_path == NULL ) {
+		fprintf( stderr, "Error: No input file provided!\n" );
+		print_help();
+		return -1;
+	}
+	
 	
 	//Creates the window and the OpenGL context.
 	glfwSetErrorCallback( GLFW_error_callback );
@@ -101,14 +49,7 @@ int main( int argc, char **argv ){
 	//Initializes the ncurses library.
 	initscr();
 	
-	//Opens the input file.
-	if( argc < 2 ) {
-		close_all();
-		fprintf( stderr, "Error: No input file provided!\n" );
-		return -1;
-	} else
-		input_file = fopen( argv[1], "r" );
-		
+	input_file = fopen( wav_path, "r" );	
 	total_samples = get_samples_number( input_file );
 	
 	//Allocates the needed memory for the channels arrays. 
@@ -127,8 +68,8 @@ int main( int argc, char **argv ){
 		else if( position > total_samples )
 			position = total_samples - 1;
 		
-		if( width < 0 )
-			width = 0;
+		if( width < 1 )
+			width = 1;
 		else if( width > MAX_WIDTH )
 			width = MAX_WIDTH;
 		
@@ -143,6 +84,43 @@ int main( int argc, char **argv ){
 	free(right);
 	
 	close_all();
+}
+
+int parse_arg( char* arg ){
+	
+	if( arg[0] == '-' ) {
+		if( arg[1] == 'c' ) {
+			if( arg[2] == 'r' ) {
+				sscanf( arg, "-cr%x", &right_color );
+			} else if ( arg[2] == 'l' ) {
+				sscanf( arg, "-cl%x", &left_color );
+			}
+		} else if( arg[1] == 'h' ) {
+			print_help();
+			return -1;
+		} else if( arg[1] == 'p' ) {
+			sscanf( arg, "-p%li", &position );
+		} else {
+			fprintf( stderr, "Error: Argument not recognised!\n" );
+			print_help(); 
+			return -1;
+		}
+	} else {
+		wav_path = arg;
+	}
+	
+	return 0;
+}
+
+void print_help() {
+		printf( "\nwavPlotter: plots the waveform of a 16-bit signed dual channel WAVE file.\n\n" );
+		printf( "Usage: wavPlotter <wav file> [OPTIONS]\n" );
+		printf( "Available options:\n" );
+		printf( " -h		Prints this info and exits.\n" );
+		printf( " -crCOLOR	Changes the color for the right channel. COLOR is an HTML color code.\n" );
+		printf( " -clCOLOR	Changes the color for the left channel. COLOR is an HTML color code.\n" );
+		printf( " -pSAMPLE	Puts the given SAMPLE at the center of the window at start-up\n" );
+		printf( "\n" );
 }
 
 void close_all() {
@@ -197,18 +175,26 @@ void plot(
 		glVertex2f( screen_w, half_screen_h );
 	glEnd();
 	
-	//Plots the left channel in red. 
+	//Plots the left channel. 
 	glBegin( GL_LINE_STRIP );
-		glColor3ub( 255, 100, 100 );
+		glColor3ub(
+			(left_color & 0xff0000) >> 16,
+			(left_color & 0x00ff00) >> 8,
+			left_color & 0x0000ff
+		);
 		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
 			if( i >= 0 && i < samples )
 				glVertex2f( i - pos + half_screen_w, half_screen_h + left_ch[i] * DEPTH );
 		} 	
 	glEnd();
 
-	//Plots the right channel in green.
+	//Plots the right channel.
 	glBegin( GL_LINE_STRIP );
-		glColor3ub( 100, 255, 100 );
+		glColor3ub(
+			(right_color & 0xff0000) >> 16,
+			(right_color & 0x00ff00) >> 8,
+			right_color & 0x0000ff
+		);
 		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
 			if( i >= 0 && i < samples )
 				glVertex2f( i - pos + half_screen_w, half_screen_h + right_ch[i] * DEPTH );
