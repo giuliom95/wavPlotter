@@ -44,7 +44,7 @@ int main(){
 		one = (int8_t)( sample & 0x00ff );
 		two = (int8_t)( sample & 0xff00 >> 8 );
 	
-		printf( "%c%c%c%c", one, two, 0, 0 );
+		printf( "%c%c%c%c", one, two, one, two );
 	
 	}
 	

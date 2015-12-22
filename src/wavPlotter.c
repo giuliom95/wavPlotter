@@ -2,19 +2,12 @@
 #include "wavPlotter.h"
 
 int main( int argc, char **argv ){
-	
-	//The two channels of a single file.
-	int16_t* left;
-	int16_t* right;
-	
-	//The number of total 16-bit samples that compose a single channel.
-	long total_samples;
-	
+
 	const int screen_width = SCREEN_WIDTH;
 	const int screen_height = SCREEN_HEIGHT;
 	
-	//The pointer to the wav file
-	FILE* input_file;
+	LIST* l;
+	LIST* r;
 	
 	position = 0;
 	width = BASE_WIDTH;
@@ -22,7 +15,8 @@ int main( int argc, char **argv ){
 	right_color = DEF_RIGHT_COLOR;
 	left_color = DEF_LEFT_COLOR;
 	
-	wav_path = NULL;
+	left = NULL;
+	right = NULL;
 	
 	for( argc--; argc > 0; argc-- ) {
 		if( parse_arg( argv[ argc ] ) != 0 ) {
@@ -30,36 +24,23 @@ int main( int argc, char **argv ){
 		}
 	}
 	
-	if( wav_path == NULL ) {
+	if( right == NULL && left == NULL ) {
 		fprintf( stderr, "Error: No input file provided!\n" );
 		print_help();
 		return -1;
 	}
 	
-	
 	//Creates the window and the OpenGL context.
 	glfwSetErrorCallback( GLFW_error_callback );
 	if( !GLFW_init( screen_width, screen_height ) ) {
 		fprintf( stderr, "Error while initializing GLFW!\n" );
-		return -1;	
+		return -1;
 	}
 	glfwSetKeyCallback( GLFW_window, GLFW_key_callback );
 	glfwSetScrollCallback( GLFW_window, GLFW_scroll_callback );
 	
 	//Initializes the ncurses library.
 	initscr();
-	
-	input_file = fopen( wav_path, "r" );	
-	total_samples = get_samples_number( input_file );
-	
-	//Allocates the needed memory for the channels arrays. 
-	left = (int16_t*) calloc( total_samples, sizeof(int16_t) );
-	right = (int16_t*) calloc( total_samples, sizeof(int16_t) );
-	
-	read_samples( input_file, left, right, total_samples );
-	
-	//Closes the file.
-	fclose( input_file );
 	
 	while( !glfwWindowShouldClose( GLFW_window ) ) {
 		
@@ -74,12 +55,23 @@ int main( int argc, char **argv ){
 			width = MAX_WIDTH;
 		
 		print_info( position, total_samples, width );
-		plot( left, right, position, total_samples, width, screen_width, screen_height );
 		
-		 glfwWaitEvents();
+		l = left;
+		r = right;
+		
+		while( l != NULL ) {
+			plot( l->data, r->data, position, total_samples, width, screen_width, screen_height );
+			l = l->next;
+			r = r->next;
+		}
+		printf( "\n" );
+		
+		glfwWaitEvents();
 	}
 	
 	//Frees the memory allocated for the channels arrays.
+	free(left->data);
+	free(right->data);
 	free(left);
 	free(right);
 	
@@ -100,13 +92,56 @@ int parse_arg( char* arg ){
 			return -1;
 		} else if( arg[1] == 'p' ) {
 			sscanf( arg, "-p%li", &position );
+		} else if( arg[1] == 's' ) {
+			sscanf( arg, "-s%li", &position );
+			position *= SAMPLE_FREQUENCY;
 		} else {
 			fprintf( stderr, "Error: Argument not recognised!\n" );
 			print_help(); 
 			return -1;
 		}
 	} else {
-		wav_path = arg;
+		FILE* input_file;
+		
+		input_file = fopen( arg, "r" );
+		
+		total_samples = get_samples_number( input_file );
+		
+		
+		
+		if( left == NULL ) {
+			printf("NULL\n");
+			
+			left = (LIST*) malloc( sizeof( LIST ) );
+			right = (LIST*) malloc( sizeof( LIST ) );
+		
+			//Allocates the needed memory for the channels arrays. 
+			left->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+			right->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+
+			read_samples( input_file, left->data, right->data, total_samples );
+			
+		} else {
+			LIST* l = left;
+			LIST* r = right;
+					
+			while( l->next != NULL ) {
+				l = l->next;
+				r = r->next;
+			} 
+		
+			l->next = (LIST*) malloc( sizeof( LIST ) );
+			r->next = (LIST*) malloc( sizeof( LIST ) );
+		
+			//Allocates the needed memory for the channels arrays. 
+			l->next->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+			r->next->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+
+			read_samples( input_file, l->next->data, r->next->data, total_samples );
+		}
+		
+		//Closes the file.
+		fclose( input_file );
 	}
 	
 	return 0;
@@ -117,9 +152,13 @@ void print_help() {
 		printf( "Usage: wavPlotter <wav file> [OPTIONS]\n" );
 		printf( "Available options:\n" );
 		printf( " -h		Prints this info and exits.\n" );
-		printf( " -crCOLOR	Changes the color for the right channel. COLOR is an HTML color code.\n" );
-		printf( " -clCOLOR	Changes the color for the left channel. COLOR is an HTML color code.\n" );
+		printf( " -crCOLOR	Changes the color for the right channel. COLOR is an HTML color\n");
+		printf( "		 code.\n" );
+		printf( " -clCOLOR	Changes the color for the left channel. COLOR is an HTML color\n" );
+		printf( "		 code.\n" );
 		printf( " -pSAMPLE	Puts the given SAMPLE at the center of the window at start-up\n" );
+		printf( " -pSECOND	Moves the sample at given SECOND in the middle of the window at\n" );
+		printf( "		 start-up\n" );
 		printf( "\n" );
 }
 
@@ -152,6 +191,7 @@ void plot(
 	int screen_w,
 	int screen_h 
 ) {
+	printf( "PLOT" );
 	int i;
 	int half_screen_w = screen_w / 2;
 	int half_screen_h = screen_h / 2;

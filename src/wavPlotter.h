@@ -73,6 +73,16 @@ void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset );
 long position;
 int width;
 
-char* wav_path;
+typedef struct _LIST {
+	int16_t* data;
+	struct _LIST* next;
+} LIST;
+
+//The two channels of a single file.
+LIST* left;
+LIST* right;
+
+//The number of total 16-bit samples that compose a single channel.
+long total_samples;
 
 uint32_t right_color, left_color;
