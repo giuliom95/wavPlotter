@@ -31,6 +31,7 @@ int parse_arg( char* arg );
 void print_help();
 void close_all();
 void print_info( long pos, long samples, int pixel_per_sample );
+void pre_plot( int zoom, int screen_w, int screen_h );
 void plot(
 	int16_t* left_ch,
 	int16_t* right_ch,
@@ -74,15 +75,13 @@ long position;
 int width;
 
 typedef struct _LIST {
-	int16_t* data;
+	int16_t* right;
+	int16_t* left;
+	long total_samples;
 	struct _LIST* next;
 } LIST;
 
 //The two channels of a single file.
-LIST* left;
-LIST* right;
-
-//The number of total 16-bit samples that compose a single channel.
-long total_samples;
+LIST* list;
 
 uint32_t right_color, left_color;

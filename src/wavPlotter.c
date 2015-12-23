@@ -7,7 +7,7 @@ int main( int argc, char **argv ){
 	const int screen_height = SCREEN_HEIGHT;
 	
 	LIST* l;
-	LIST* r;
+	long maximum_samples;
 	
 	position = 0;
 	width = BASE_WIDTH;
@@ -15,8 +15,7 @@ int main( int argc, char **argv ){
 	right_color = DEF_RIGHT_COLOR;
 	left_color = DEF_LEFT_COLOR;
 	
-	left = NULL;
-	right = NULL;
+	list = NULL;
 	
 	for( argc--; argc > 0; argc-- ) {
 		if( parse_arg( argv[ argc ] ) != 0 ) {
@@ -24,10 +23,18 @@ int main( int argc, char **argv ){
 		}
 	}
 	
-	if( right == NULL && left == NULL ) {
+	if( list == NULL ) {
 		fprintf( stderr, "Error: No input file provided!\n" );
 		print_help();
 		return -1;
+	}
+	
+	l = list;
+	maximum_samples = l->total_samples;
+	while( l != NULL ) {
+		if( maximum_samples < l->total_samples )
+			maximum_samples = l->total_samples;
+		l = l->next;
 	}
 	
 	//Creates the window and the OpenGL context.
@@ -46,34 +53,30 @@ int main( int argc, char **argv ){
 		
 		if( position < 0 )
 			position = 0;
-		else if( position > total_samples )
-			position = total_samples - 1;
+		else if( position > maximum_samples )
+			position = maximum_samples - 1;
 		
 		if( width < 1 )
 			width = 1;
 		else if( width > MAX_WIDTH )
 			width = MAX_WIDTH;
 		
-		print_info( position, total_samples, width );
+		print_info( position, maximum_samples, width );
 		
-		l = left;
-		r = right;
+		l = list;
 		
+		pre_plot( width, screen_width, screen_height );
 		while( l != NULL ) {
-			plot( l->data, r->data, position, total_samples, width, screen_width, screen_height );
+			plot( l->left, l->right, position, l->total_samples, width, screen_width, screen_height );
 			l = l->next;
-			r = r->next;
 		}
-		printf( "\n" );
+		glfwSwapBuffers( GLFW_window );
 		
 		glfwWaitEvents();
 	}
 	
 	//Frees the memory allocated for the channels arrays.
-	free(left->data);
-	free(right->data);
-	free(left);
-	free(right);
+	free(list);
 	
 	close_all();
 }
@@ -105,39 +108,34 @@ int parse_arg( char* arg ){
 		
 		input_file = fopen( arg, "r" );
 		
-		total_samples = get_samples_number( input_file );
-		
-		
-		
-		if( left == NULL ) {
-			printf("NULL\n");
+		if( list == NULL ) {
 			
-			left = (LIST*) malloc( sizeof( LIST ) );
-			right = (LIST*) malloc( sizeof( LIST ) );
-		
+			list = (LIST*) malloc( sizeof( LIST ) );
+			
+			list->total_samples = get_samples_number( input_file );
+			
 			//Allocates the needed memory for the channels arrays. 
-			left->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
-			right->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+			list->left = (int16_t*) calloc( list->total_samples, sizeof(int16_t) );
+			list->right = (int16_t*) calloc( list->total_samples, sizeof(int16_t) );
 
-			read_samples( input_file, left->data, right->data, total_samples );
+			read_samples( input_file, list->left, list->right, list->total_samples );
 			
 		} else {
-			LIST* l = left;
-			LIST* r = right;
+			LIST* l = list;
 					
 			while( l->next != NULL ) {
 				l = l->next;
-				r = r->next;
 			} 
 		
 			l->next = (LIST*) malloc( sizeof( LIST ) );
-			r->next = (LIST*) malloc( sizeof( LIST ) );
-		
+			
+			l->next->total_samples = get_samples_number( input_file );
+			
 			//Allocates the needed memory for the channels arrays. 
-			l->next->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
-			r->next->data = (int16_t*) calloc( total_samples, sizeof(int16_t) );
+			l->next->left = (int16_t*) calloc( l->next->total_samples, sizeof(int16_t) );
+			l->next->right = (int16_t*) calloc( l->next->total_samples, sizeof(int16_t) );
 
-			read_samples( input_file, l->next->data, r->next->data, total_samples );
+			read_samples( input_file, l->next->left, l->next->right, l->next->total_samples );
 		}
 		
 		//Closes the file.
@@ -182,19 +180,7 @@ void print_info( long pos, long samples, int zoom ){
 	refresh();
 }
 
-void plot( 
-	int16_t* left_ch, 
-	int16_t* right_ch, 
-	long pos, 
-	long samples, 
-	int zoom,
-	int screen_w,
-	int screen_h 
-) {
-	printf( "PLOT" );
-	int i;
-	int half_screen_w = screen_w / 2;
-	int half_screen_h = screen_h / 2;
+void pre_plot( int zoom, int screen_w, int screen_h ) {
 	
 	//Cleans the screen
 	glClear( GL_COLOR_BUFFER_BIT );
@@ -211,9 +197,24 @@ void plot(
 	//Plots the time axis.
 	glBegin( GL_LINES );
 		glColor3ub( 150, 150, 150 );
-		glVertex2f( 0, half_screen_h );
-		glVertex2f( screen_w, half_screen_h );
+		glVertex2f( 0, screen_h / 2 );
+		glVertex2f( screen_w, screen_h /2 );
 	glEnd();
+}
+
+void plot( 
+	int16_t* left_ch, 
+	int16_t* right_ch, 
+	long pos, 
+	long samples, 
+	int zoom,
+	int screen_w,
+	int screen_h 
+) {
+
+	int i;
+	int half_screen_w = screen_w / 2;
+	int half_screen_h = screen_h / 2;
 	
 	//Plots the left channel. 
 	glBegin( GL_LINE_STRIP );
@@ -240,8 +241,6 @@ void plot(
 				glVertex2f( i - pos + half_screen_w, half_screen_h + right_ch[i] * DEPTH );
 		}	
 	glEnd();	
-	
-	glfwSwapBuffers( GLFW_window );
 }
 
 int get_samples_number( FILE* fd ){
