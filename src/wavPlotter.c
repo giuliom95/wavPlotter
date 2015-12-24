@@ -5,20 +5,20 @@ int main( int argc, char **argv ){
 
 	const int screen_width = SCREEN_WIDTH;
 	const int screen_height = SCREEN_HEIGHT;
+	int arg;
 	
-	LIST* l;
+	List* l;
 	long maximum_samples;
 	
 	position = 0;
 	width = BASE_WIDTH;
 	
-	right_color = DEF_RIGHT_COLOR;
-	left_color = DEF_LEFT_COLOR;
+	srand( time( NULL ) );
 	
 	list = NULL;
 	
-	for( argc--; argc > 0; argc-- ) {
-		if( parse_arg( argv[ argc ] ) != 0 ) {
+	for( arg = 1; arg < argc; arg++ ) {
+		if( parse_arg( argv[ arg ] ) != 0 ) {
 			return -1;
 		}
 	}
@@ -67,12 +67,30 @@ int main( int argc, char **argv ){
 		
 		pre_plot( width, screen_width, screen_height );
 		while( l != NULL ) {
-			plot( l->left, l->right, position, l->total_samples, width, screen_width, screen_height );
+			plot( 
+				l->left, 
+				l->right, 
+				position, 
+				l->total_samples, 
+				width, 
+				screen_width, 
+				screen_height, 
+				l->left_color,
+				l->right_color 
+			);
+			
 			l = l->next;
 		}
 		glfwSwapBuffers( GLFW_window );
 		
 		glfwWaitEvents();
+	}
+	
+	l = list;
+	while( l != NULL ) {
+		free( l->right );
+		free( l->left );
+		l = l->next;
 	}
 	
 	//Frees the memory allocated for the channels arrays.
@@ -84,13 +102,7 @@ int main( int argc, char **argv ){
 int parse_arg( char* arg ){
 	
 	if( arg[0] == '-' ) {
-		if( arg[1] == 'c' ) {
-			if( arg[2] == 'r' ) {
-				sscanf( arg, "-cr%x", &right_color );
-			} else if ( arg[2] == 'l' ) {
-				sscanf( arg, "-cl%x", &left_color );
-			}
-		} else if( arg[1] == 'h' ) {
+		if( arg[1] == 'h' ) {
 			print_help();
 			return -1;
 		} else if( arg[1] == 'p' ) {
@@ -110,9 +122,12 @@ int parse_arg( char* arg ){
 		
 		if( list == NULL ) {
 			
-			list = (LIST*) malloc( sizeof( LIST ) );
+			list = (List*) malloc( sizeof( List ) );
 			
 			list->total_samples = get_samples_number( input_file );
+			
+			list->left_color = DEF_LEFT_COLOR;
+			list->right_color = DEF_RIGHT_COLOR;
 			
 			//Allocates the needed memory for the channels arrays. 
 			list->left = (int16_t*) calloc( list->total_samples, sizeof(int16_t) );
@@ -121,15 +136,18 @@ int parse_arg( char* arg ){
 			read_samples( input_file, list->left, list->right, list->total_samples );
 			
 		} else {
-			LIST* l = list;
+			List* l = list;
 					
 			while( l->next != NULL ) {
 				l = l->next;
 			} 
 		
-			l->next = (LIST*) malloc( sizeof( LIST ) );
+			l->next = (List*) malloc( sizeof( List ) );
 			
 			l->next->total_samples = get_samples_number( input_file );
+			
+			l->next->left_color = DEF_LEFT_COLOR_ALT;
+			l->next->right_color = DEF_RIGHT_COLOR_ALT;
 			
 			//Allocates the needed memory for the channels arrays. 
 			l->next->left = (int16_t*) calloc( l->next->total_samples, sizeof(int16_t) );
@@ -209,7 +227,9 @@ void plot(
 	long samples, 
 	int zoom,
 	int screen_w,
-	int screen_h 
+	int screen_h,
+	Color l_col,
+	Color r_col
 ) {
 
 	int i;
@@ -219,9 +239,9 @@ void plot(
 	//Plots the left channel. 
 	glBegin( GL_LINE_STRIP );
 		glColor3ub(
-			(left_color & 0xff0000) >> 16,
-			(left_color & 0x00ff00) >> 8,
-			left_color & 0x0000ff
+			(l_col & 0xff0000) >> 16,
+			(l_col & 0x00ff00) >> 8,
+			l_col & 0x0000ff
 		);
 		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
 			if( i >= 0 && i < samples )
@@ -232,9 +252,9 @@ void plot(
 	//Plots the right channel.
 	glBegin( GL_LINE_STRIP );
 		glColor3ub(
-			(right_color & 0xff0000) >> 16,
-			(right_color & 0x00ff00) >> 8,
-			right_color & 0x0000ff
+			(r_col & 0xff0000) >> 16,
+			(r_col & 0x00ff00) >> 8,
+			r_col & 0x0000ff
 		);
 		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
 			if( i >= 0 && i < samples )
