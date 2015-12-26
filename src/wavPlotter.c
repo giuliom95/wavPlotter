@@ -12,8 +12,7 @@ int main( int argc, char **argv ){
 	
 	position = 0;
 	width = BASE_WIDTH;
-	
-	srand( time( NULL ) );
+	plot_spectrum = FALSE;
 	
 	list = NULL;
 	
@@ -47,7 +46,7 @@ int main( int argc, char **argv ){
 	glfwSetScrollCallback( GLFW_window, GLFW_scroll_callback );
 	
 	//Initializes the ncurses library.
-	initscr();
+	//initscr();
 	
 	while( !glfwWindowShouldClose( GLFW_window ) ) {
 		
@@ -61,22 +60,18 @@ int main( int argc, char **argv ){
 		else if( width > MAX_WIDTH )
 			width = MAX_WIDTH;
 		
-		print_info( position, maximum_samples, width );
+		//print_info( position, maximum_samples, width );
 		
 		l = list;
 		
 		pre_plot( width, screen_width, screen_height );
 		while( l != NULL ) {
 			plot( 
-				l->left, 
-				l->right, 
-				position, 
-				l->total_samples, 
+				*l,
+				position,
 				width, 
 				screen_width, 
-				screen_height, 
-				l->left_color,
-				l->right_color 
+				screen_height 
 			);
 			
 			l = l->next;
@@ -90,6 +85,10 @@ int main( int argc, char **argv ){
 	while( l != NULL ) {
 		free( l->right );
 		free( l->left );
+		fftw_free( l->left_spectrum );
+		fftw_free( l->right_spectrum );
+		fftw_destroy_plan( l->left_plan );
+		fftw_destroy_plan( l->right_plan );
 		l = l->next;
 	}
 	
@@ -117,44 +116,47 @@ int parse_arg( char* arg ){
 		}
 	} else {
 		FILE* input_file;
+		List* l;
 		
 		input_file = fopen( arg, "r" );
 		
-		if( list == NULL ) {
+		l = list;
+		
+		if( list != NULL ) {
+			printf( "PROVA\n" );
+			while( l->next != NULL ) {
+				printf( "CICLO\n" );
+				l = l->next;
+			}
 			
-			list = (List*) malloc( sizeof( List ) );
+			l->next = (List*) malloc( sizeof( List ) );
+			l = l->next;
 			
-			list->total_samples = get_samples_number( input_file );
-			
-			list->left_color = DEF_LEFT_COLOR;
-			list->right_color = DEF_RIGHT_COLOR;
-			
-			//Allocates the needed memory for the channels arrays. 
-			list->left = (int16_t*) calloc( list->total_samples, sizeof(int16_t) );
-			list->right = (int16_t*) calloc( list->total_samples, sizeof(int16_t) );
-
-			read_samples( input_file, list->left, list->right, list->total_samples );
+			l->left_color = DEF_LEFT_COLOR_ALT;
+			l->right_color = DEF_RIGHT_COLOR_ALT; 
 			
 		} else {
-			List* l = list;
-					
-			while( l->next != NULL ) {
-				l = l->next;
-			} 
 		
-			l->next = (List*) malloc( sizeof( List ) );
+			list = (List*) malloc( sizeof( List ) );
+			l = list;
 			
-			l->next->total_samples = get_samples_number( input_file );
-			
-			l->next->left_color = DEF_LEFT_COLOR_ALT;
-			l->next->right_color = DEF_RIGHT_COLOR_ALT;
-			
-			//Allocates the needed memory for the channels arrays. 
-			l->next->left = (int16_t*) calloc( l->next->total_samples, sizeof(int16_t) );
-			l->next->right = (int16_t*) calloc( l->next->total_samples, sizeof(int16_t) );
-
-			read_samples( input_file, l->next->left, l->next->right, l->next->total_samples );
+			l->left_color = DEF_LEFT_COLOR;
+			l->right_color = DEF_RIGHT_COLOR;
 		}
+		
+		l->total_samples = get_samples_number( input_file );
+		
+		//Allocates the needed memory for the channels arrays. 
+		l->left = (int16_t*) calloc( l->total_samples, sizeof(int16_t) );
+		l->right = (int16_t*) calloc( l->total_samples, sizeof(int16_t) );
+		
+		l->left_spectrum = (fftw_complex*) fftw_malloc( sizeof( fftw_complex ) * ( l->total_samples / 2 + 1 ) );
+		l->right_spectrum = (fftw_complex*) fftw_malloc( sizeof( fftw_complex ) * ( l->total_samples / 2 + 1 ) );
+		
+		l->left_plan = fftw_plan_dft_r2c_1d( l->total_samples, (double*) l->left, l->left_spectrum, FFTW_ESTIMATE );		
+		l->right_plan = fftw_plan_dft_r2c_1d( l->total_samples, (double*) l->right, l->right_spectrum, FFTW_ESTIMATE );
+		
+		read_samples( input_file, l->left, l->right, l->total_samples );
 		
 		//Closes the file.
 		fclose( input_file );
@@ -168,10 +170,6 @@ void print_help() {
 		printf( "Usage: wavPlotter <wav file> [OPTIONS]\n" );
 		printf( "Available options:\n" );
 		printf( " -h		Prints this info and exits.\n" );
-		printf( " -crCOLOR	Changes the color for the right channel. COLOR is an HTML color\n");
-		printf( "		 code.\n" );
-		printf( " -clCOLOR	Changes the color for the left channel. COLOR is an HTML color\n" );
-		printf( "		 code.\n" );
 		printf( " -pSAMPLE	Puts the given SAMPLE at the center of the window at start-up\n" );
 		printf( " -pSECOND	Moves the sample at given SECOND in the middle of the window at\n" );
 		printf( "		 start-up\n" );
@@ -221,46 +219,54 @@ void pre_plot( int zoom, int screen_w, int screen_h ) {
 }
 
 void plot( 
-	int16_t* left_ch, 
-	int16_t* right_ch, 
-	long pos, 
-	long samples, 
+	List l, 
+	long pos,
 	int zoom,
 	int screen_w,
-	int screen_h,
-	Color l_col,
-	Color r_col
+	int screen_h
 ) {
 
 	int i;
 	int half_screen_w = screen_w / 2;
 	int half_screen_h = screen_h / 2;
 	
-	//Plots the left channel. 
-	glBegin( GL_LINE_STRIP );
-		glColor3ub(
-			(l_col & 0xff0000) >> 16,
-			(l_col & 0x00ff00) >> 8,
-			l_col & 0x0000ff
-		);
-		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
-			if( i >= 0 && i < samples )
-				glVertex2f( i - pos + half_screen_w, half_screen_h + left_ch[i] * DEPTH );
-		} 	
-	glEnd();
+	if( !plot_spectrum ) {
+		//Plots the left channel. 
+		glBegin( GL_LINE_STRIP );
+			glColor3ub(
+				(l.left_color & 0xff0000) >> 16,
+				(l.left_color & 0x00ff00) >> 8,
+				l.left_color & 0x0000ff
+			);
+			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
+				if( i >= 0 && i < l.total_samples )
+					glVertex2f( i - pos + half_screen_w, half_screen_h + l.left[i] * DEPTH );
+			} 	
+		glEnd();
 
-	//Plots the right channel.
-	glBegin( GL_LINE_STRIP );
-		glColor3ub(
-			(r_col & 0xff0000) >> 16,
-			(r_col & 0x00ff00) >> 8,
-			r_col & 0x0000ff
-		);
+		//Plots the left channel. 
+		glBegin( GL_LINE_STRIP );
+			glColor3ub(
+				(l.right_color & 0xff0000) >> 16,
+				(l.right_color & 0x00ff00) >> 8,
+				l.right_color & 0x0000ff
+			);
+			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
+				if( i >= 0 && i < l.total_samples )
+					glVertex2f( i - pos + half_screen_w, half_screen_h + l.right[i] * DEPTH );
+			} 	
+		glEnd();
+	} else {
+		fftw_execute( l.left_plan );
+		fftw_execute( l.right_plan );
+	
 		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
-			if( i >= 0 && i < samples )
-				glVertex2f( i - pos + half_screen_w, half_screen_h + right_ch[i] * DEPTH );
-		}	
-	glEnd();	
+			if( i >= 0 && i < l.total_samples / 2 )
+				printf( "%i %f %f\n", i, l.left_spectrum[i][0], l.left_spectrum[i][1] );
+		}
+		printf("FINE");
+		
+	}
 }
 
 int get_samples_number( FILE* fd ){
@@ -324,11 +330,14 @@ static void GLFW_key_callback( GLFWwindow* window, int key, int scancode, int ac
 			case GLFW_KEY_LEFT:
 				position -= BASE_SCROLL_SPEED;
 				break;
-			case GLFW_KEY_S:
+			case GLFW_KEY_D:
 				width++;
 				break;
 			case GLFW_KEY_A:
 				width--;
+				break;
+			case GLFW_KEY_S:
+				plot_spectrum = !plot_spectrum;
 				break;
 		}
 	}
@@ -341,7 +350,9 @@ void GLFW_scroll_callback( GLFWwindow* window, double xoffset, double yoffset ){
 	} else {
 		if( glfwGetKey( window, GLFW_KEY_LEFT_ALT ) == GLFW_PRESS )
 			position -= (long) yoffset * BASE_SCROLL_SPEED * 10;
-		else 
+		else if( glfwGetKey( window, GLFW_KEY_LEFT_CONTROL ) == GLFW_PRESS )
+			position -= (long) yoffset * BASE_SCROLL_SPEED / 5;
+		else
 			position -= (long) yoffset * BASE_SCROLL_SPEED;
 	}
 }

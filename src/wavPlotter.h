@@ -32,8 +32,12 @@
 typedef uint32_t Color;
 
 typedef struct _LIST {
-	int16_t* right;
 	int16_t* left;
+	int16_t* right;
+	fftw_complex *left_spectrum;
+	fftw_complex *right_spectrum;
+	fftw_plan left_plan;
+	fftw_plan right_plan;
 	long total_samples;
 	Color right_color;
 	Color left_color;
@@ -46,16 +50,12 @@ void print_help();
 void close_all();
 void print_info( long pos, long samples, int pixel_per_sample );
 void pre_plot( int zoom, int screen_w, int screen_h );
-void plot(
-	int16_t* left_ch,
-	int16_t* right_ch,
+void plot( 
+	List l, 
 	long pos,
-	long samples,
-	int pixel_per_sample,
+	int zoom,
 	int screen_w,
-	int screen_h,
-	Color l_col,
-	Color r_col
+	int screen_h
 );
 
 /* Returns the samples of a given WAVE file.
@@ -92,3 +92,5 @@ int width;
 
 //The two channels of a single file.
 List* list;
+
+short plot_spectrum;
