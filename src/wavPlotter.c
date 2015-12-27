@@ -46,7 +46,7 @@ int main( int argc, char **argv ){
 	glfwSetScrollCallback( GLFW_window, GLFW_scroll_callback );
 	
 	//Initializes the ncurses library.
-	//initscr();
+	initscr();
 	
 	while( !glfwWindowShouldClose( GLFW_window ) ) {
 		
@@ -60,7 +60,7 @@ int main( int argc, char **argv ){
 		else if( width > MAX_WIDTH )
 			width = MAX_WIDTH;
 		
-		//print_info( position, maximum_samples, width );
+		print_info( position, maximum_samples, width );
 		
 		l = list;
 		
@@ -81,18 +81,15 @@ int main( int argc, char **argv ){
 		glfwWaitEvents();
 	}
 	
+	//Frees the memory allocated for every WAVE file loaded
 	l = list;
 	while( l != NULL ) {
 		free( l->right );
 		free( l->left );
 		fftw_free( l->left_spectrum );
 		fftw_free( l->right_spectrum );
-		fftw_destroy_plan( l->left_plan );
-		fftw_destroy_plan( l->right_plan );
 		l = l->next;
 	}
-	
-	//Frees the memory allocated for the channels arrays.
 	free(list);
 	
 	close_all();
@@ -117,6 +114,11 @@ int parse_arg( char* arg ){
 	} else {
 		FILE* input_file;
 		List* l;
+		double* left_double;
+		double* right_double;
+		int i;
+		fftw_plan left_plan;
+		fftw_plan right_plan;
 		
 		input_file = fopen( arg, "r" );
 		
@@ -153,10 +155,34 @@ int parse_arg( char* arg ){
 		l->left_spectrum = (fftw_complex*) fftw_malloc( sizeof( fftw_complex ) * ( l->total_samples / 2 + 1 ) );
 		l->right_spectrum = (fftw_complex*) fftw_malloc( sizeof( fftw_complex ) * ( l->total_samples / 2 + 1 ) );
 		
-		l->left_plan = fftw_plan_dft_r2c_1d( l->total_samples, (double*) l->left, l->left_spectrum, FFTW_ESTIMATE );		
-		l->right_plan = fftw_plan_dft_r2c_1d( l->total_samples, (double*) l->right, l->right_spectrum, FFTW_ESTIMATE );
+		left_double = (double*) calloc( l->total_samples, sizeof( double ) );
+		right_double = (double*) calloc( l->total_samples, sizeof( double ) );
 		
 		read_samples( input_file, l->left, l->right, l->total_samples );
+		
+		for( i = 0; i < l->total_samples; i++ ){
+			left_double[i] = l->left[i];
+			right_double[i] = l->right[i];
+		}
+		
+		for( i = 0; i < ( l->total_samples / 2 + 1 ); i++ ) {
+			l->left_spectrum[i][0] = 0;
+			l->left_spectrum[i][1] = 0;
+			l->right_spectrum[i][0] = 0;
+			l->right_spectrum[i][1] = 0;
+		}
+		
+		left_plan = fftw_plan_dft_r2c_1d( l->total_samples, left_double, l->left_spectrum, FFTW_ESTIMATE );		
+		right_plan = fftw_plan_dft_r2c_1d( l->total_samples, right_double, l->right_spectrum, FFTW_ESTIMATE );
+		
+		fftw_execute( left_plan );
+		fftw_execute( right_plan );
+		
+		fftw_destroy_plan( left_plan );
+		fftw_destroy_plan( right_plan );
+		
+		free( left_double );
+		free( right_double );
 		
 		//Closes the file.
 		fclose( input_file );
@@ -257,14 +283,32 @@ void plot(
 			} 	
 		glEnd();
 	} else {
-		fftw_execute( l.left_plan );
-		fftw_execute( l.right_plan );
 	
-		for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
-			if( i >= 0 && i < l.total_samples / 2 )
-				printf( "%i %f %f\n", i, l.left_spectrum[i][0], l.left_spectrum[i][1] );
-		}
-		printf("FINE");
+		//Plots the real part of the left spectrum. 
+		glBegin( GL_LINE_STRIP );
+			glColor3ub(
+				(l.left_color & 0xff0000) >> 16,
+				(l.left_color & 0x00ff00) >> 8,
+				l.left_color & 0x0000ff
+			);
+			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
+				if( i >= 0 && i < l.total_samples )
+					glVertex2f( i - pos + half_screen_w, half_screen_h + l.left_spectrum[i][0] * SPECTRUM_DEPTH );
+			} 	
+		glEnd();
+
+		//Plots the immaginary part of the left spectrum. 
+		glBegin( GL_LINE_STRIP );
+			glColor3ub(
+				(l.right_color & 0xff0000) >> 16,
+				(l.right_color & 0x00ff00) >> 8,
+				l.right_color & 0x0000ff
+			);
+			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
+				if( i >= 0 && i < l.total_samples )
+					glVertex2f( i - pos + half_screen_w, half_screen_h + l.left_spectrum[i][1] * SPECTRUM_DEPTH );
+			} 	
+		glEnd();
 		
 	}
 }

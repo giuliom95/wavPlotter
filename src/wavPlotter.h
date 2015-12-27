@@ -26,6 +26,11 @@
 // 1 : 2^16 = DEPTH : SCREEN_HEIGHT 
 #define DEPTH 0.009155273f
 
+//Same as above, but this time for the spectrum of the signal.
+//It's simply DEPTH / 100
+//TODO: Discover why it works this way.
+#define SPECTRUM_DEPTH 0.00009155273f
+
 //The length(in bytes) of the header of a standard WAV file.
 #define WAV_HEADER 44
 
@@ -36,8 +41,6 @@ typedef struct _LIST {
 	int16_t* right;
 	fftw_complex *left_spectrum;
 	fftw_complex *right_spectrum;
-	fftw_plan left_plan;
-	fftw_plan right_plan;
 	long total_samples;
 	Color right_color;
 	Color left_color;
