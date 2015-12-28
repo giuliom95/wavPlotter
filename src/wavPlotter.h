@@ -27,9 +27,8 @@
 #define DEPTH 0.009155273f
 
 //Same as above, but this time for the spectrum of the signal.
-//It's simply DEPTH / 100
 //TODO: Discover why it works this way.
-#define SPECTRUM_DEPTH 0.00009155273f
+#define SPECTRUM_DEPTH 0.00000025f
 
 //The length(in bytes) of the header of a standard WAV file.
 #define WAV_HEADER 44
@@ -50,7 +49,6 @@ typedef struct _LIST {
 //TODO: Add specifications of these methods.
 int parse_arg( char* arg );
 void print_help();
-void close_all();
 void print_info( long pos, long samples, int pixel_per_sample );
 void pre_plot( int zoom, int screen_w, int screen_h );
 void plot( 

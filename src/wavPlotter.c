@@ -77,7 +77,7 @@ int main( int argc, char **argv ){
 			l = l->next;
 		}
 		glfwSwapBuffers( GLFW_window );
-		
+
 		glfwWaitEvents();
 	}
 	
@@ -92,7 +92,11 @@ int main( int argc, char **argv ){
 	}
 	free(list);
 	
-	close_all();
+	//Shuts down ncurses.
+	endwin();
+	
+	//Shuts down GLFW and OpenGL.
+	GLFW_close();
 }
 
 int parse_arg( char* arg ){
@@ -125,9 +129,8 @@ int parse_arg( char* arg ){
 		l = list;
 		
 		if( list != NULL ) {
-			printf( "PROVA\n" );
+
 			while( l->next != NULL ) {
-				printf( "CICLO\n" );
 				l = l->next;
 			}
 			
@@ -136,7 +139,6 @@ int parse_arg( char* arg ){
 			
 			l->left_color = DEF_LEFT_COLOR_ALT;
 			l->right_color = DEF_RIGHT_COLOR_ALT; 
-			
 		} else {
 		
 			list = (List*) malloc( sizeof( List ) );
@@ -145,6 +147,8 @@ int parse_arg( char* arg ){
 			l->left_color = DEF_LEFT_COLOR;
 			l->right_color = DEF_RIGHT_COLOR;
 		}
+		
+		l->next = NULL;
 		
 		l->total_samples = get_samples_number( input_file );
 		
@@ -202,13 +206,6 @@ void print_help() {
 		printf( "\n" );
 }
 
-void close_all() {
-	//Shuts down ncurses.
-	endwin();
-	
-	//Shuts down GLFW and OpenGL.
-	GLFW_close();
-}
 
 void print_info( long pos, long samples, int zoom ){
 	move( 0, 0 );
@@ -219,6 +216,10 @@ void print_info( long pos, long samples, int zoom ){
 		(double) samples / SAMPLE_FREQUENCY 
 	);
 	printw( "Zoom level: %i\n", zoom );
+	if( plot_spectrum )
+		printw( "[SPECTRUM]" );
+	else
+		clrtoeol();
 	refresh();
 }
 
@@ -236,12 +237,25 @@ void pre_plot( int zoom, int screen_w, int screen_h ) {
 		screen_h, 0.0f, 1.0f, -1.0f 
 	);
 	
-	//Plots the time axis.
-	glBegin( GL_LINES );
-		glColor3ub( 150, 150, 150 );
-		glVertex2f( 0, screen_h / 2 );
-		glVertex2f( screen_w, screen_h /2 );
-	glEnd();
+	if( !plot_spectrum ) {
+	
+		//Plots the time axis.
+		glBegin( GL_LINES );
+			glColor3ub( 150, 150, 150 );
+			glVertex2f( 0, screen_h / 2 );
+			glVertex2f( screen_w, screen_h /2 );
+		glEnd();
+		
+	} else {
+		//Plots two time axes.
+		glBegin( GL_LINES );
+			glColor3ub( 150, 150, 150 );
+			glVertex2f( 0, screen_h / 3 );
+			glVertex2f( screen_w, screen_h / 3 );
+			glVertex2f( 0, screen_h * 2 / 3 );
+			glVertex2f( screen_w, screen_h * 2 / 3 );
+		glEnd();
+	}
 }
 
 void plot( 
@@ -283,7 +297,9 @@ void plot(
 			} 	
 		glEnd();
 	} else {
-	
+		
+		long spectrum_samples = l.total_samples / 2 + 1;
+		
 		//Plots the real part of the left spectrum. 
 		glBegin( GL_LINE_STRIP );
 			glColor3ub(
@@ -292,8 +308,8 @@ void plot(
 				l.left_color & 0x0000ff
 			);
 			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
-				if( i >= 0 && i < l.total_samples )
-					glVertex2f( i - pos + half_screen_w, half_screen_h + l.left_spectrum[i][0] * SPECTRUM_DEPTH );
+				if( i >= 0 && i < spectrum_samples )
+					glVertex2f( i - pos + half_screen_w, (screen_h / 3) + l.left_spectrum[i][0] * SPECTRUM_DEPTH / 2);
 			} 	
 		glEnd();
 
@@ -305,8 +321,34 @@ void plot(
 				l.right_color & 0x0000ff
 			);
 			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
-				if( i >= 0 && i < l.total_samples )
-					glVertex2f( i - pos + half_screen_w, half_screen_h + l.left_spectrum[i][1] * SPECTRUM_DEPTH );
+				if( i >= 0 && i < spectrum_samples )
+					glVertex2f( i - pos + half_screen_w, (screen_h / 3) + l.right_spectrum[i][0] * SPECTRUM_DEPTH );
+			} 	
+		glEnd();
+		
+		//Plots the real part of the left spectrum. 
+		glBegin( GL_LINE_STRIP );
+			glColor3ub(
+				(l.left_color & 0xff0000) >> 16,
+				(l.left_color & 0x00ff00) >> 8,
+				l.left_color & 0x0000ff
+			);
+			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
+				if( i >= 0 && i < spectrum_samples )
+					glVertex2f( i - pos + half_screen_w, (screen_h * 2 / 3) + l.left_spectrum[i][1] * SPECTRUM_DEPTH );
+			} 	
+		glEnd();
+
+		//Plots the immaginary part of the left spectrum. 
+		glBegin( GL_LINE_STRIP );
+			glColor3ub(
+				(l.right_color & 0xff0000) >> 16,
+				(l.right_color & 0x00ff00) >> 8,
+				l.right_color & 0x0000ff
+			);
+			for( i = pos - half_screen_w + zoom; i < pos + half_screen_w - zoom; i++ ) {
+				if( i >= 0 && i < spectrum_samples )
+					glVertex2f( i - pos + half_screen_w, (screen_h * 2 / 3) + l.right_spectrum[i][1] * SPECTRUM_DEPTH );
 			} 	
 		glEnd();
 		
